@@ -1,0 +1,12 @@
+.DS_Store
+.ipynb_checkpoints/
+*.lammpstrj
+*.xyz
+*.7z
+*.zip
+*.whl
+*.gz
+*.csv
+matrix_output/
+ligpargen_params/
+meltquench_output.lammpstrj

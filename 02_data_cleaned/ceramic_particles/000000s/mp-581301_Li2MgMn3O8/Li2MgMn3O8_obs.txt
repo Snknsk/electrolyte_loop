@@ -1,0 +1,2 @@
+# Time-averaged data for fix obs
+# TimeStep c_cavg c_msdall[4]

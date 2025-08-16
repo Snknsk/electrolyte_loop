@@ -1,0 +1,37 @@
+LAMMPS (29 Aug 2024)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+atom_modify map array
+comm_modify vel yes
+
+read_data Li2CrFeO4_crystal.data
+Reading data file ...
+  triclinic box = (0 0 0) to (25.83857 29.758665 36.47796) with tilt (0.03234 -12.850355 -7.41877)
+WARNING: Triclinic box skew is large. LAMMPS will run inefficiently. (src/domain.cpp:221)
+  1 by 2 by 3 MPI processor grid
+  reading atoms ...
+  3000 atoms
+  read_data CPU = 0.014 seconds
+box tilt large
+
+The 'box' command has been removed and will be ignored
+
+
+# Melt: Buckingham only (no kspace) to avoid long-range blowups
+pair_style   buck 12.0
+pair_modify  mix arithmetic
+pair_coeff * * 1388.77 0.3623 0.0
+
+# Safer neighbor settings
+neighbor 4.0 bin
+neigh_modify every 1 delay 0 check yes
+thermo_modify lost error
+
+# RDF during melt
+compute gr all rdf 200 10.0
+ERROR: Illegal compute rdf command (src/compute_rdf.cpp:84)
+Last command: compute gr all rdf 200 10.0

@@ -1,0 +1,122 @@
+# ---------- PREAMBLE ----------
+units           metal
+atom_style      charge
+boundary        p p p
+read_data       Li2Co3SbO8_crystal.data
+
+pair_style      buck/coul/long 12.0
+kspace_style    pppm 1.0e-4
+pair_modify     mix arithmetic
+pair_coeff      * * 1388.77 0.3623 0.0
+
+neighbor        4.0 bin
+neigh_modify    every 1 delay 0 check yes
+thermo          2000
+thermo_style    custom step temp press pe etotal
+thermo_modify   lost error
+
+# ---------- SOFT START ----------
+velocity        all create 300.0 12345 mom yes rot yes dist gaussian
+fix             soft all nve/limit 0.03
+fix             tl   all langevin 300.0 300.0 5.0 7777
+timestep        0.001
+run             1500
+unfix           tl
+unfix           soft
+
+# ---------- GLOBAL COMPUTES / SAMPLING ----------
+compute         csm all centro/atom fcc
+compute         msdALL all msd
+compute         gr all rdf 200
+
+# ave/time: split scalars vs arrays
+# - scalars (avg centro + MSD[4]) with 'ave running' so 'overwrite' is legal
+compute         cavgHOT HOT reduce ave c_csm
+fix             fobs all ave/time 200 1 200 c_msdALL[4] c_cavgHOT ave running file Li2Co3SbO8_obs.txt overwrite
+# - RDF array alone with mode vector
+fix             frdf all ave/time 200 1 200 c_gr[*] ave running file Li2Co3SbO8_rdf.txt mode vector overwrite
+
+# ---------- VOXEL PARTITION CONSTANTS ----------
+variable        Nx equal 6
+variable        Ny equal 6
+variable        Nz equal 6
+
+# Box extents
+variable        Lx equal xhi-xlo
+variable        Ly equal yhi-ylo
+variable        Lz equal zhi-zlo
+
+# ---------- FRACTION LADDER ----------
+variable        frac index 0.200 0.400 0.600 0.800 1.000
+label           FRAC_LOOP
+
+# Define per-atom voxel indices and hashed noise (deterministic)
+# floor() clamps into [0,N-1] for each axis
+variable        ix atom floor((x - xlo)/v_Lx * v_Nx)
+variable        iy atom floor((y - ylo)/v_Ly * v_Ny)
+variable        iz atom floor((z - zlo)/v_Lz * v_Nz)
+# linear cell id
+variable        cid atom (v_ix*v_Ny*v_Nz + v_iy*v_Nz + v_iz)
+# pseudo-random in [0,1): fract(|sin(cid*C)|*K)
+variable        noise atom mod(abs(sin(v_cid*12.9898)*43758.5453),1.0)
+# HOT if noise < frac
+variable        isHot atom (v_noise < v_frac)
+
+# (Re)define groups this fraction
+group           HOT variable isHot
+group           COLD subtract all HOT
+
+# Report selection
+variable        nAll equal count(all)
+variable        nHot equal count(HOT)
+print           "Selected HOT ~ ${nHot}/${nAll} atoms (target fraction = ${frac})"
+
+# ---------- SPLIT HEAT ----------
+variable        Thot  equal 4000.0
+variable        Tcold equal 300.0
+
+# NVT on HOT and COLD separately (fixed volume), then brief HOT hold
+fix             fH HOT  nvt temp ${Tcold} ${Thot} 5.0
+fix             fC COLD nvt temp ${Tcold} ${Tcold} 5.0
+fix             dtr all dt/reset 200 0.0008 0.0012 0.02
+dump            dH HOT  custom 1000 Li2Co3SbO8_frac_${frac}_HOT.lammpstrj  id type x y z
+dump            dC COLD custom 1000 Li2Co3SbO8_frac_${frac}_COLD.lammpstrj id type x y z
+dump_modify     dH sort id
+dump_modify     dC sort id
+
+run             20000   # ramp HOT up
+unfix           dtr
+run             20000   # hold HOT at Thot
+
+# ---------- FAST QUENCH HOT -> 900 K ----------
+fix_modify      fH temp ${Thot} 900.0 5.0
+run             50000
+
+# merge thermostats and equilibrate the whole system
+unfix           fH
+unfix           fC
+undump          dH
+undump          dC
+
+# ---------- WHOLE-BOX NPT COOL 900 -> 300 ----------
+fix             cool all npt temp 900.0 300.0 10.0 iso 1.0 1.0 200.0
+fix             dtr2 all dt/reset 200 0.0008 0.0012 0.02
+dump            box all custom 2000 Li2Co3SbO8_frac_${frac}_BOX.lammpstrj id type x y z
+dump_modify     box sort id
+run             200000
+unfix           dtr2
+unfix           cool
+undump          box
+
+# ---------- FINAL RELAX + SAVE ----------
+minimize        1.0e-4 1.0e-6 1000 10000
+write_data      Li2Co3SbO8_out_frac_${frac}.data
+write_dump      all xyz Li2Co3SbO8_out_frac_${frac}.xyz modify element O Co Li Sb
+
+# next fraction
+next            frac
+jump            SELF FRAC_LOOP
+
+# --- teardown global sampling ---
+unfix           frdf
+unfix           fobs

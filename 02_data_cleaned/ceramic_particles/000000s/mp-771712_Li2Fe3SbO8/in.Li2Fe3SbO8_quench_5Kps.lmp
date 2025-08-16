@@ -1,0 +1,56 @@
+# LAMMPS Quenching Script for Li2Fe3SbO8 - 5 K/ps
+# VERY SLOW quench - mostly crystalline
+units metal
+atom_style charge
+boundary p p p
+processors * * *  # Use all available processors
+
+# FIRST: Read structure to define box
+read_data Li2Fe3SbO8_melted_liquid.data
+
+# THEN: Define potential (after box is defined)
+# Morse potential for strong ceramic bonding
+# This gives REAL solid behavior, not gas!
+
+# Morse potential - much better for solids than LJ
+pair_style morse 12.0
+
+# NOW set pair coefficients (after both pair_style and read_data)
+# D0=5.0 eV (strong bonds), alpha=2.0, r0=2.5 Angstrom
+pair_coeff * * 5.0 2.0 2.5
+
+# Neighbor list
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+
+# STAGE 1: QUENCH from 4500K to 300K at 5 K/ps
+# This will take 840.0 ps
+# Use NVT to maintain density during cooling
+fix 1 all nvt temp 4500 300 $(100.0*dt)
+timestep 0.001
+
+# Output
+thermo 1000
+thermo_style custom step time temp press vol etotal ke pe density
+dump 1 all custom 5000 Li2Fe3SbO8_quench_5Kps_trajectory.dump id type x y z vx vy vz
+
+print "Starting QUENCH of Li2Fe3SbO8 from liquid at 4500K to 300K"
+print "Cooling rate: 5 K/ps - expecting crystalline"
+run 840000
+
+# STAGE 2: Equilibrate at 300K for 50 ps
+unfix 1
+fix 1 all nvt temp 300 300 $(100.0*dt)
+
+print "Equilibrating Li2Fe3SbO8 quenched structure at 300K"
+run 50000
+
+# STAGE 3: Final minimization
+minimize 1.0e-4 1.0e-6 1000 10000
+
+# Save quenched structure with descriptive name
+write_data Li2Fe3SbO8_quenched_5Kps_crystalline.data
+write_dump all xyz Li2Fe3SbO8_quenched_5Kps_crystalline.xyz modify element Li Fe Sb O
+undump 1
+
+print "QUENCH COMPLETE for {formula} at {cooling_rate} K/ps - structure type: {structure_type}"

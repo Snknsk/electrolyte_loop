@@ -1,0 +1,52 @@
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+atom_modify map array
+comm_modify vel yes
+
+read_data Li2Mn3SeO34_melted_liquid_charged.data
+
+pair_style      buck/coul/long 12.0
+kspace_style    pppm 1.0e-4
+pair_modify     mix arithmetic
+pair_coeff * *  1388.77 0.3623 0.0
+
+neighbor 4.0 bin
+neigh_modify every 1 delay 0 check yes
+thermo_modify lost error
+
+# RDF during quench
+compute gr all rdf 200
+fix frdf all ave/time 200 1 200 c_gr[*] ave running file Li2Mn3SeO34_quench_500Kps_rdf.txt mode vector overwrite
+
+# Gentle start
+fix lim all nve/limit 0.03
+fix tl  all langevin 3500 3500 5.0 13579
+timestep 0.001
+thermo 5000
+dump 1 all custom 100000 Li2Mn3SeO34_quench_500Kps.dump id type x y z
+run 5000
+unfix lim
+unfix tl
+
+# NPT quench
+fix 1 all npt temp 3500 300 10.0 iso 1.0 1.0 200.0
+print "Starting QUENCH of Li2Mn3SeO34 from 3500K to 300K at 500 K/ps  (~6.4 ps)"
+run 6400
+unfix 1
+
+# Final NVT equilibration
+fix 2 all nvt temp 300 300 5.0
+run 30000
+unfix 2
+
+# Final minimize + write
+minimize 1.0e-4 1.0e-6 1000 10000
+unfix frdf
+write_data Li2Mn3SeO34_quenched_500Kps_mostly_amorphous.data
+write_dump all xyz Li2Mn3SeO34_quenched_500Kps_mostly_amorphous.xyz modify element O Li Se Mn
+undump 1
+
+print "QUENCH COMPLETE for Li2Mn3SeO34 at 500 K/ps - structure type: mostly_amorphous"
+    

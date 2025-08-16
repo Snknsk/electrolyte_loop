@@ -1,0 +1,60 @@
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+atom_modify map array
+
+# Read crystal
+read_data Cs2Li2SiO4_crystal.data
+
+# --- MELT: NO COULOMB (Buckingham only), no kspace ---
+pair_style   buck 12.0
+pair_modify  mix arithmetic
+pair_coeff * * 1388.77 0.3623 0.0
+
+# Conservative neighbor settings to avoid lost atoms during ramp/box changes
+neighbor 3.0 bin
+neigh_modify every 1 delay 0 check yes
+thermo_modify lost error
+
+# Quick minimize (remove worst overlaps)
+minimize 1.0e-4 1.0e-6 500 5000
+
+# Stage 0: 2 ps limiter + Langevin at 300 K to absorb shock
+velocity all create 300.0 12345 dist gaussian mom yes rot yes
+fix lim all nve/limit 0.03
+fix tl  all langevin 300.0 300.0 5.0 90210
+thermo 5000
+timestep 0.001
+run 2000
+unfix tl
+unfix lim
+
+# Stage 1: single-stage fast NVT ramp 300 -> 3500 K with adaptive dt
+fix heat all nvt temp 300.0 3500 5.0
+# Start at 1.5 fs but allow down to 1.0 fs if needed
+timestep 0.0015
+fix dtr all dt/reset 100 0.001 0.0015 0.02
+
+dump 1 all custom 100000 Cs2Li2SiO4_melting_trajectory.dump id type x y z
+print "Starting MELTING of Cs2Li2SiO4: single-stage NVT 300K -> 3500K over 8 ps"
+run 8000
+unfix heat
+unfix dtr
+
+# Stage 2: short NPT in liquid to relax density (conservative settings)
+# Keep small timestep and frequent neighbor checks to avoid lost atoms on volume change
+fix liq all npt temp 3500 3500 10.0 iso 1.0 1.0 100.0
+# Keep dt at 1.5 fs but allow reduction if velocity spikes
+timestep 0.0015
+fix dtr2 all dt/reset 100 0.001 0.0015 0.02
+run 5000
+unfix dtr2
+unfix liq
+
+# Save liquid
+write_data Cs2Li2SiO4_melted_liquid.data nocoeff
+write_dump all xyz Cs2Li2SiO4_melted_liquid.xyz modify element Si Li Cs O
+undump 1
+
+print "MELTING COMPLETE for {formula} - liquid saved"

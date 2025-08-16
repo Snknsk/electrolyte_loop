@@ -1,0 +1,125 @@
+# ==== Inhomogeneous HOT↔COLD heating ladder for Rb2Li2GeO4 ====
+units           metal
+atom_style      charge
+boundary        p p p
+
+read_data       Rb2Li2GeO4_crystal.data
+
+pair_style      buck/coul/long 12.0
+kspace_style    pppm 1.0e-4
+pair_modify     mix arithmetic
+pair_coeff      * * 1388.77 0.3623 0.0
+
+neighbor        4.0 bin
+neigh_modify    every 1 delay 0 check yes
+thermo          2000
+thermo_style    custom step temp press pe etotal
+
+# soft start to avoid shocks
+velocity        all create 300.0 12345 mom yes rot yes dist gaussian
+fix             soft all nve/limit 0.03
+fix             tl   all langevin 300.0 300.0 5.0 7777
+timestep        0.001
+run             1500
+unfix           tl
+unfix           soft
+
+# order/structure sampling
+compute         csm all centro/atom fcc
+compute         cavg all reduce ave c_csm
+compute         msdall all msd
+compute         gr all rdf 200
+fix             obs all ave/time 200 1 200 c_cavg c_msdall[4] c_gr[*] file Rb2Li2GeO4_obs.txt mode vector overwrite
+
+# box dims (for random sphere placement)
+variable        Lx equal xhi-xlo
+variable        Ly equal yhi-ylo
+variable        Lz equal zhi-zlo
+
+# Loop over target HOT fractions
+variable        frac index 0.200 0.400 0.600 0.800 1.000
+
+label           FRAC_LOOP
+
+# clear any previous HOT/COLD groups
+group           HOT delete
+group           COLD delete
+
+# parameters for HOT geometry
+variable        Rs    equal 20.000
+variable        Ns    equal 10
+variable        seed  equal 9999
+
+# randomly place Ns spheres and union as HOT
+variable        i loop ${Ns}
+label           MAKE_SPHERES
+  variable xr equal xlo + ${Lx}*random(0.0,1.0,${seed}+${i})
+  variable yr equal ylo + ${Ly}*random(0.0,1.0,${seed}+2*${i})
+  variable zr equal zlo + ${Lz}*random(0.0,1.0,${seed}+3*${i})
+  region   sph_${i} sphere ${xr} ${yr} ${zr} ${Rs} units box
+  if "${i} == 1" then "group HOT region sph_${i}"                   else "group HOT union HOT region sph_${i}"
+next            i
+jump            SELF MAKE_SPHERES
+
+# make complementary COLD
+group           COLD subtract all HOT
+
+# report HOT fraction estimate
+variable        nAll equal count(all)
+variable        nHot equal count(HOT)
+variable        fEst equal 1.0*${nHot}/${nAll}
+print           ">>> Target fraction = ${frac}, Estimated HOT fraction = ${fEst}"
+
+# ------------- SPLIT HEATING -------------
+# HOT: 300 -> Thot, COLD: ~Tcold
+variable        Thot  equal 4000.0
+variable        Tcold equal 300.0
+
+# dump during HOT heating/quench
+dump            dH HOT custom 2000 Rb2Li2GeO4_frac_${frac}_HOT.lammpstrj id type x y z q
+dump_modify     dH sort id
+
+dump            dC COLD custom 2000 Rb2Li2GeO4_frac_${frac}_COLD.lammpstrj id type x y z q
+dump_modify     dC sort id
+
+fix             fH HOT  nvt temp 300.0 ${Thot} 5.0
+fix             fC COLD nvt temp 300.0 300.0 5.0
+fix             dtr all dt/reset 200 0.0008 0.0012 0.02
+run             20000
+unfix           dtr
+
+# HOT hold at Thot
+run             20000
+
+# fast quench HOT: Thot -> 900 K
+fix_modify      fH temp ${Thot} 900.0 5.0
+run             50000
+
+# tidy up split stage
+undump          dH
+undump          dC
+unfix           fH
+unfix           fC
+
+# ------------- WHOLE-SYSTEM NPT COOL -------------
+dump            dNPT all custom 2000 Rb2Li2GeO4_frac_${frac}_NPT.lammpstrj id type x y z q
+dump_modify     dNPT sort id
+
+fix             cool all npt temp 900.0 300.0 10.0 iso 1.0 1.0 200.0
+fix             dtr2 all dt/reset 200 0.0008 0.0012 0.02
+run             200000
+unfix           dtr2
+unfix           cool
+undump          dNPT
+
+# final relax + save snapshots
+minimize        1.0e-4 1.0e-6 1000 10000
+write_data      Rb2Li2GeO4_out_frac_${frac}.data
+write_dump      all xyz Rb2Li2GeO4_out_frac_${frac}.xyz modify element Li O Rb Ge
+
+# next fraction
+next            frac
+jump            SELF FRAC_LOOP
+
+# teardown samplers
+unfix           obs

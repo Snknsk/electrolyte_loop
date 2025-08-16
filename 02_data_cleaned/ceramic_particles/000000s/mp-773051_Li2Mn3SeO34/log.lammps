@@ -1,0 +1,305 @@
+LAMMPS (29 Aug 2024)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+atom_modify map array
+comm_modify vel yes
+
+read_data Li2Mn3SeO34_melted_liquid_charged.data
+Reading data file ...
+  triclinic box = (0 0 0) to (39.407352 39.308664 52.924087) with tilt (-19.196134 1.815964 -15.916758)
+  1 by 2 by 3 MPI processor grid
+  reading atoms ...
+  5250 atoms
+  reading velocities ...
+  5250 velocities
+  read_data CPU = 0.027 seconds
+
+pair_style      buck/coul/long 12.0
+kspace_style    pppm 1.0e-4
+pair_modify     mix arithmetic
+pair_coeff * *  1388.77 0.3623 0.0
+
+neighbor 4.0 bin
+neigh_modify every 1 delay 0 check yes
+thermo_modify lost error
+
+# RDF during quench
+compute gr all rdf 200
+fix frdf all ave/time 200 1 200 c_gr[*] ave running file Li2Mn3SeO34_quench_50Kps_rdf.txt mode vector overwrite
+
+# Gentle start
+fix lim all nve/limit 0.03
+fix tl  all langevin 3500 3500 5.0 13579
+timestep 0.001
+thermo 5000
+dump 1 all custom 100000 Li2Mn3SeO34_quench_50Kps.dump id type x y z
+run 5000
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- Type Label Framework: https://doi.org/10.1021/acs.jpcb.3c08419
+
+@Article{Gissinger24,
+ author = {Jacob R. Gissinger, Ilia Nikiforov, Yaser Afshar, Brendon Waters, Moon-ki Choi, Daniel S. Karls, Alexander Stukowski, Wonpil Im, Hendrik Heinz, Axel Kohlmeyer, and Ellad B. Tadmor},
+ title = {Type Label Framework for Bonded Force Fields in LAMMPS},
+ journal = {J. Phys. Chem. B},
+ year =    2024,
+ volume =  128,
+ number =  13,
+ pages =   {3282–-3297}
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+PPPM initialization ...
+WARNING: System is not charge neutral, net charge = 0.1 (src/kspace.cpp:327)
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.22807907
+  grid = 18 24 30
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00061219917
+  estimated relative force accuracy = 4.2514879e-05
+  using double precision FFTW3
+  3d grid and FFT values/proc = 8075 2160
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 16
+  ghost atom cutoff = 16
+  binsize = 8, bins = 8 7 7
+  2 neighbor lists, perpetual/occasional/extra = 1 1 0
+  (1) pair buck/coul/long, perpetual
+      attributes: half, newton on
+      pair build: half/bin/atomonly/newton/tri
+      stencil: half/bin/3d/tri
+      bin: standard
+  (2) compute rdf, occasional, copy from (1)
+      attributes: half, newton on
+      pair build: copy
+      stencil: none
+      bin: none
+Per MPI rank memory allocation (min/avg/max) = 8.693 | 8.698 | 8.703 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   482.37901      14545.138      0              14872.426      981600.43    
+      5000   1357.5919      14479.235      0              15400.343      1023310.1    
+Loop time of 29.6566 on 6 procs for 5000 steps with 5250 atoms
+
+Performance: 14.567 ns/day, 1.648 hours/ns, 168.597 timesteps/s, 885.132 katom-step/s
+98.1% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 23.354     | 23.595     | 23.717     |   2.5 | 79.56
+Kspace  | 4.2931     | 4.4167     | 4.666      |   6.0 | 14.89
+Neigh   | 0.22381    | 0.23774    | 0.25628    |   2.4 |  0.80
+Comm    | 1.071      | 1.0836     | 1.1016     |   0.9 |  3.65
+Output  | 2.7625e-05 | 0.00021048 | 0.00024867 |   0.0 |  0.00
+Modify  | 0.2279     | 0.2304     | 0.2388     |   0.8 |  0.78
+Other   |            | 0.09303    |            |       |  0.31
+
+Nlocal:            875 ave         881 max         869 min
+Histogram: 1 0 0 0 2 1 1 0 0 1
+Nghost:          11811 ave       11844 max       11781 min
+Histogram: 1 1 1 0 1 0 0 0 0 2
+Neighs:         479803 ave      484141 max      475858 min
+Histogram: 1 0 0 2 1 0 1 0 0 1
+
+Total # of neighbors = 2878817
+Ave neighs/atom = 548.3461
+Neighbor list builds = 10
+Dangerous builds = 0
+unfix lim
+unfix tl
+
+# NPT quench
+fix 1 all npt temp 3500 300 10.0 iso 1.0 1.0 200.0
+print "Starting QUENCH of Li2Mn3SeO34 from 3500K to 300K at 50 K/ps  (~64.0 ps)"
+Starting QUENCH of Li2Mn3SeO34 from 3500K to 300K at 50 K/ps  (~64.0 ps)
+run 64000
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.22807907
+  grid = 18 24 30
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00061219917
+  estimated relative force accuracy = 4.2514879e-05
+  using double precision FFTW3
+  3d grid and FFT values/proc = 8075 2160
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Per MPI rank memory allocation (min/avg/max) = 9.994 | 9.998 | 10 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press          Volume    
+      5000   1357.5919      14479.235      0              15400.343      1023310.1      81982.076    
+     10000   1663.0269      12951.175      0              14079.516      941720.07      84240.735    
+     15000   1765.7225      11215.956      0              12413.975      834306.13      87437.06     
+     20000   1820.3502      9783.5089      0              11018.592      745864.32      90499.999    
+     25000   1827.1332      8711.5199      0              9951.2052      680007.84      93161.055    
+     30000   1890.6846      7758.7548      0              9041.5588      623637.47      95670.244    
+     35000   1905.8148      6937.1245      0              8230.1941      575120.81      98096.318    
+     40000   1883.5438      6202.3285      0              7480.2875      532464.09      100459.19    
+     45000   1859.2549      5476.4257      0              6737.9051      492430.34      102769       
+     50000   1762.8998      4769.4827      0              5965.5864      454509.77      105027.98    
+     55000   1606.1021      4140.1849      0              5229.9035      420660.11      107237.32    
+     60000   1456.0866      3546.4483      0              4534.3834      389886.95      109399.38    
+     65000   1313.5117      2976.8542      0              3868.0541      360730.76      111515.48    
+     69000   1196.6909      2533.0049      0              3344.9435      338968.91      113175.74    
+Loop time of 332.409 on 6 procs for 64000 steps with 5250 atoms
+
+Performance: 16.635 ns/day, 1.443 hours/ns, 192.534 timesteps/s, 1.011 Matom-step/s
+98.2% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 249.12     | 249.95     | 251.37     |   5.8 | 75.19
+Kspace  | 50.942     | 52.363     | 53.224     |  11.8 | 15.75
+Neigh   | 6.0796     | 6.3037     | 6.5373     |   6.1 |  1.90
+Comm    | 11.635     | 11.719     | 11.812     |   1.5 |  3.53
+Output  | 0.0013074  | 0.0059865  | 0.0075193  |   2.8 |  0.00
+Modify  | 10.52      | 10.754     | 10.912     |   4.2 |  3.24
+Other   |            | 1.31       |            |       |  0.39
+
+Nlocal:            875 ave         889 max         866 min
+Histogram: 1 1 1 1 0 0 1 0 0 1
+Nghost:        9659.83 ave        9666 max        9640 min
+Histogram: 1 0 0 0 0 0 1 0 0 4
+Neighs:         350589 ave      356141 max      347099 min
+Histogram: 2 0 1 1 0 0 1 0 0 1
+
+Total # of neighbors = 2103533
+Ave neighs/atom = 400.67295
+Neighbor list builds = 313
+Dangerous builds = 0
+unfix 1
+
+# Final NVT equilibration
+fix 2 all nvt temp 300 300 5.0
+run 30000
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.22791719
+  grid = 20 27 30
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00052630396
+  estimated relative force accuracy = 3.6549787e-05
+  using double precision FFTW3
+  3d grid and FFT values/proc = 9639 2800
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Per MPI rank memory allocation (min/avg/max) = 10.11 | 10.12 | 10.13 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+     69000   1196.6909      2533.0427      0              3344.9813      338966.15    
+     70000   1161.584       2512.8551      0              3300.9742      338144.91    
+     75000   909.27245      2344.8835      0              2961.8126      331603.83    
+     80000   710.2788       2197.3608      0              2679.2754      326025.43    
+     85000   548.88237      2102.95        0              2475.3593      322222.22    
+     90000   448.49434      2027.4611      0              2331.7584      319267.06    
+     95000   380.04756      1973.8037      0              2231.6608      317400.39    
+     99000   333.66012      1948.427       0              2174.8109      316330.49    
+Loop time of 127.977 on 6 procs for 30000 steps with 5250 atoms
+
+Performance: 20.254 ns/day, 1.185 hours/ns, 234.417 timesteps/s, 1.231 Matom-step/s
+98.7% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 97.905     | 98.57      | 99.487     |   6.2 | 77.02
+Kspace  | 21.377     | 22.337     | 23.021     |  13.6 | 17.45
+Neigh   | 0.55451    | 0.58108    | 0.59752    |   1.9 |  0.45
+Comm    | 5.1891     | 5.2254     | 5.2561     |   1.1 |  4.08
+Output  | 0.00034063 | 0.0026765  | 0.0031516  |   2.0 |  0.00
+Modify  | 0.94107    | 0.96698    | 1.0375     |   3.3 |  0.76
+Other   |            | 0.2946     |            |       |  0.23
+
+Nlocal:            875 ave         879 max         870 min
+Histogram: 1 0 1 0 0 1 1 0 1 1
+Nghost:         9681.5 ave        9708 max        9668 min
+Histogram: 2 0 1 1 1 0 0 0 0 1
+Neighs:         351048 ave      352887 max      349408 min
+Histogram: 2 0 0 1 0 1 0 0 0 2
+
+Total # of neighbors = 2106285
+Ave neighs/atom = 401.19714
+Neighbor list builds = 34
+Dangerous builds = 0
+unfix 2
+
+# Final minimize + write
+minimize 1.0e-4 1.0e-6 1000 10000
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.22791719
+  grid = 20 27 30
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00052630396
+  estimated relative force accuracy = 3.6549787e-05
+  using double precision FFTW3
+  3d grid and FFT values/proc = 9639 2800
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Per MPI rank memory allocation (min/avg/max) = 11.23 | 11.24 | 11.25 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+     99000   333.66012      1948.427       0              2174.8109      316330.49    
+     99017   333.66012      1717.151       0              1943.5349      309587.95    
+Loop time of 0.144886 on 6 procs for 17 steps with 5250 atoms
+
+98.7% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      1948.42698835678   1717.25484336585    1717.1509920558
+  Force two-norm initial, final = 54.38103 1.2095858
+  Force max component initial, final = 1.9686859 0.33486021
+  Final line search alpha, max atom move = 0.36059036 0.12074736
+  Iterations, force evaluations = 17 26
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.11553    | 0.11748    | 0.12017    |   0.5 | 81.09
+Kspace  | 0.016987   | 0.01954    | 0.021307   |   1.1 | 13.49
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.0046724  | 0.0049194  | 0.0051349  |   0.3 |  3.40
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.002945   |            |       |  2.03
+
+Nlocal:            875 ave         880 max         871 min
+Histogram: 1 1 1 0 0 1 0 1 0 1
+Nghost:        9681.33 ave        9697 max        9652 min
+Histogram: 1 0 0 1 0 0 0 0 2 2
+Neighs:         351106 ave      353052 max      349489 min
+Histogram: 2 0 1 0 0 0 1 0 1 1
+
+Total # of neighbors = 2106638
+Ave neighs/atom = 401.26438
+Neighbor list builds = 0
+Dangerous builds = 0
+unfix frdf
+write_data Li2Mn3SeO34_quenched_50Kps_mixed_crystalline.data
+System init for write_data ...
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.22791719
+  grid = 20 27 30
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00052630396
+  estimated relative force accuracy = 3.6549787e-05
+  using double precision FFTW3
+  3d grid and FFT values/proc = 9639 2800
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+WARNING: Not all mixed pair coeffs generated from mixing. Use write_data with 'pair ij' option to store all pair coeffs. (src/write_data.cpp:364)
+write_dump all xyz Li2Mn3SeO34_quenched_50Kps_mixed_crystalline.xyz modify element O Li Se Mn
+undump 1
+
+print "QUENCH COMPLETE for Li2Mn3SeO34 at 50 K/ps - structure type: mixed_crystalline"
+QUENCH COMPLETE for Li2Mn3SeO34 at 50 K/ps - structure type: mixed_crystalline
+    
+Total wall time: 0:08:10

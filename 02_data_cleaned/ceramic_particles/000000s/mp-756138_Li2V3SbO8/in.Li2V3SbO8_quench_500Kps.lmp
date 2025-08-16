@@ -1,0 +1,66 @@
+# LAMMPS Quenching Script for Li2V3SbO8 - 500 K/ps
+# MODERATE quench - mostly amorphous
+units metal
+atom_style charge
+boundary p p p
+processors * * *  # Use all available processors
+
+# Read melted/liquid structure
+read_data Li2V3SbO8_melted_liquid.data
+
+# Define potential
+# Morse potential for strong ceramic bonding
+# This gives REAL solid behavior, not gas!
+
+# Morse potential - much better for solids than LJ
+pair_style morse 12.0
+# pair_coeff i j D0 alpha r0
+# D0=5.0 eV (VERY strong bonds - ceramics need this!)
+# alpha=2.0 (steepness)  
+# r0=2.5 Angstrom (equilibrium bond distance)
+pair_coeff * * 5.0 2.0 2.5
+
+# This will give:
+# - Strong attraction at ~2.5 Angstrom (solid density)
+# - Strong repulsion below 2.0 Angstrom (atoms don't overlap)
+# - Negligible interaction beyond 5-6 Angstrom
+
+# Alternative: Use a tabulated potential from DFT if available
+# pair_style table linear 1000
+# pair_coeff * * potential.table ENTRY
+
+# Neighbor list
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+
+# STAGE 1: QUENCH from 3500K to 300K at 500 K/ps
+# This will take 6.4 ps
+# Use NVT to maintain density during cooling
+fix 1 all nvt temp 3500 300 $(100.0*dt)
+timestep 0.001
+
+# Output
+thermo 1000
+thermo_style custom step time temp press vol etotal ke pe density
+dump 1 all custom 5000 Li2V3SbO8_quench_500Kps_trajectory.dump id type x y z vx vy vz
+
+print "Starting QUENCH of Li2V3SbO8 from liquid at 3500K to 300K"
+print "Cooling rate: 500 K/ps - expecting mostly_amorphous"
+run 6400
+
+# STAGE 2: Equilibrate at 300K for 50 ps
+unfix 1
+fix 1 all nvt temp 300 300 $(100.0*dt)
+
+print "Equilibrating Li2V3SbO8 quenched structure at 300K"
+run 50000
+
+# STAGE 3: Final minimization
+minimize 1.0e-4 1.0e-6 1000 10000
+
+# Save quenched structure with descriptive name
+write_data Li2V3SbO8_quenched_500Kps_mostly_amorphous.data
+write_dump all xyz Li2V3SbO8_quenched_500Kps_mostly_amorphous.xyz modify element V Li Sb O
+undump 1
+
+print "QUENCH COMPLETE for {formula} at {cooling_rate} K/ps - structure type: {structure_type}"

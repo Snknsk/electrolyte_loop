@@ -1,0 +1,134 @@
+LAMMPS (29 Aug 2024)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+# ---------- PREAMBLE ----------
+units           metal
+atom_style      charge
+boundary        p p p
+read_data       SrLi2SiN22_crystal.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (42.817347 42.817347 42.817347)
+  2 by 1 by 3 MPI processor grid
+  reading atoms ...
+  6912 atoms
+  read_data CPU = 0.028 seconds
+
+pair_style      buck/coul/long 12.0
+kspace_style    pppm 1.0e-4
+pair_modify     mix arithmetic
+pair_coeff      * * 1388.77 0.3623 0.0
+
+neighbor        4.0 bin
+neigh_modify    every 1 delay 0 check yes
+thermo          2000
+thermo_style    custom step temp press pe etotal
+
+# ---------- HELPERS ----------
+velocity        all create 300.0 12345 mom yes rot yes dist gaussian
+fix             soft all nve/limit 0.03
+fix             tl   all langevin 300.0 300.0 5.0 7777
+timestep        0.001
+run             1500
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- Type Label Framework: https://doi.org/10.1021/acs.jpcb.3c08419
+
+@Article{Gissinger24,
+ author = {Jacob R. Gissinger, Ilia Nikiforov, Yaser Afshar, Brendon Waters, Moon-ki Choi, Daniel S. Karls, Alexander Stukowski, Wonpil Im, Hendrik Heinz, Axel Kohlmeyer, and Ellad B. Tadmor},
+ title = {Type Label Framework for Bonded Force Fields in LAMMPS},
+ journal = {J. Phys. Chem. B},
+ year =    2024,
+ volume =  128,
+ number =  13,
+ pages =   {3282–-3297}
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+PPPM initialization ...
+WARNING: System is not charge neutral, net charge = 0.0768 (src/kspace.cpp:327)
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.23783016
+  grid = 24 24 24
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.0013398012
+  estimated relative force accuracy = 9.3044044e-05
+  using double precision FFTW3
+  3d grid and FFT values/proc = 8835 2304
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 16
+  ghost atom cutoff = 16
+  binsize = 8, bins = 6 6 6
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair buck/coul/long, perpetual
+      attributes: half, newton on
+      pair build: half/bin/atomonly/newton
+      stencil: half/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 8.149 | 8.281 | 8.541 Mbytes
+   Step          Temp          Press          PotEng         TotEng    
+         0   300            3925960.7      55997.049      56265.044    
+      1500   966.57538      2604413.9      16662.377      17525.835    
+Loop time of 15.2423 on 6 procs for 1500 steps with 6912 atoms
+
+Performance: 8.503 ns/day, 2.823 hours/ns, 98.410 timesteps/s, 680.212 katom-step/s
+99.2% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 12.061     | 12.746     | 13.624     |  15.0 | 83.63
+Kspace  | 1.0755     | 1.96       | 2.6522     |  38.6 | 12.86
+Neigh   | 0.16561    | 0.16983    | 0.17644    |   0.9 |  1.11
+Comm    | 0.2969     | 0.29934    | 0.30272    |   0.3 |  1.96
+Output  | 1.3167e-05 | 1.6778e-05 | 2.9625e-05 |   0.0 |  0.00
+Modify  | 0.044481   | 0.045605   | 0.046282   |   0.3 |  0.30
+Other   |            | 0.02108    |            |       |  0.14
+
+Nlocal:           1152 ave        1165 max        1143 min
+Histogram: 1 2 0 1 0 0 0 1 0 1
+Nghost:        15148.8 ave       15170 max       15121 min
+Histogram: 1 0 0 0 2 0 1 0 1 1
+Neighs:         869474 ave      907934 max      830144 min
+Histogram: 2 0 0 1 0 0 1 0 0 2
+
+Total # of neighbors = 5216842
+Ave neighs/atom = 754.75145
+Neighbor list builds = 10
+Dangerous builds = 0
+unfix           tl
+unfix           soft
+
+# sampling (order proxy + RDF + MSD)
+compute         csm all centro/atom fcc
+compute         cavg all reduce ave c_csm
+compute         msdall all msd
+compute         gr all rdf 200
+
+# ---- FIXED: split ave/time ----
+# scalars (centrosymmetry avg and MSD[4])
+fix             obs all ave/time 200 1 200 c_cavg c_msdall[4] ave running file SrLi2SiN22_obs.txt overwrite
+# RDF array on its own line, with 'mode vector'
+fix             rdf all ave/time 200 1 200 c_gr[*] ave running file SrLi2SiN22_rdf.txt mode vector overwrite
+# --------------------------------
+
+# ---------- LOOP OVER HOT FRACTIONS ----------
+variable        nF equal 5
+variable        frac index 0.200 0.400 0.600 0.800 1.000
+
+label           fracLoop
+
+# --- (A) DEFINE HOT REGION AS RANDOM UNION OF SPHERES ---
+variable        Rs       equal 20.0           # Å
+variable        Ns       equal 10
+variable        seed     equal 9999
+
+group           HOT delete
+ERROR: Could not find group delete group ID HOT (src/group.cpp:104)
+Last command: group           HOT delete

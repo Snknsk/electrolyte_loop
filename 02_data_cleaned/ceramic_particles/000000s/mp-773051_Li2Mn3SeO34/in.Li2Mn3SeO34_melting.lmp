@@ -1,0 +1,62 @@
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+atom_modify map array
+comm_modify vel yes
+
+read_data Li2Mn3SeO34_crystal.data
+
+# Melt: Buckingham only (no kspace) to avoid long-range blowups
+pair_style   buck 12.0
+pair_modify  mix arithmetic
+pair_coeff * * 1388.77 0.3623 0.0
+
+# Safer neighbor settings
+neighbor 4.0 bin
+neigh_modify every 1 delay 0 check yes
+thermo_modify lost error
+
+# RDF during melt
+compute gr all rdf 200
+fix frdf all ave/time 100 1 100 c_gr[*] ave running file Li2Mn3SeO34_melt_rdf.txt mode vector overwrite
+
+# Quick minimize
+minimize 1.0e-4 1.0e-6 500 5000
+
+# Gentle preheat (2 ps)
+velocity all create 300.0 12345 dist gaussian mom yes rot yes
+fix lim all nve/limit 0.03
+fix tl  all langevin 300.0 300.0 5.0 90210
+thermo 5000
+timestep 0.001
+run 2000
+unfix tl
+unfix lim
+
+# NVT ramp 300 -> 3500 K with adaptive dt
+fix heat all nvt temp 300.0 3500 5.0
+timestep 0.0015
+fix dtr all dt/reset 100 0.001 0.0015 0.02
+
+dump 1 all custom 100000 Li2Mn3SeO34_melting_trajectory.dump id type x y z
+print "Starting MELTING of Li2Mn3SeO34: single-stage NVT 300K -> 3500K over 8 ps"
+run 8000
+unfix heat
+unfix dtr
+
+# Short NPT in liquid
+fix liq all npt temp 3500 3500 10.0 iso 1.0 1.0 100.0
+timestep 0.0015
+fix dtr2 all dt/reset 100 0.001 0.0015 0.02
+run 5000
+unfix dtr2
+unfix liq
+
+# Save liquid
+unfix frdf
+write_data Li2Mn3SeO34_melted_liquid.data nocoeff
+write_dump all xyz Li2Mn3SeO34_melted_liquid.xyz modify element O Li Se Mn
+undump 1
+
+print "MELTING COMPLETE for Li2Mn3SeO34 - liquid saved"

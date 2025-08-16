@@ -1,0 +1,126 @@
+LAMMPS (29 Aug 2024)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+# ---------- PREAMBLE ----------
+units           metal
+atom_style      charge
+boundary        p p p
+read_data       Li2MnGeO4_crystal.data
+Reading data file ...
+  triclinic box = (0 0 0) to (37.921542 37.813515 32.592855) with tilt (-2.860237 17.530894 18.906933)
+WARNING: Triclinic box skew is large. LAMMPS will run inefficiently. (src/domain.cpp:221)
+  2 by 3 by 1 MPI processor grid
+  reading atoms ...
+  4000 atoms
+  read_data CPU = 0.019 seconds
+
+pair_style      buck/coul/long 12.0
+kspace_style    pppm 1.0e-4
+pair_modify     mix arithmetic
+pair_coeff      * * 1388.77 0.3623 0.0
+
+neighbor        4.0 bin
+neigh_modify    every 1 delay 0 check yes
+thermo          2000
+thermo_style    custom step temp press pe etotal
+thermo_modify   lost error
+
+# ---------- SOFT START ----------
+velocity        all create 300.0 12345 mom yes rot yes dist gaussian
+fix             soft all nve/limit 0.03
+fix             tl   all langevin 300.0 300.0 5.0 7777
+timestep        0.001
+run             1500
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- Type Label Framework: https://doi.org/10.1021/acs.jpcb.3c08419
+
+@Article{Gissinger24,
+ author = {Jacob R. Gissinger, Ilia Nikiforov, Yaser Afshar, Brendon Waters, Moon-ki Choi, Daniel S. Karls, Alexander Stukowski, Wonpil Im, Hendrik Heinz, Axel Kohlmeyer, and Ellad B. Tadmor},
+ title = {Type Label Framework for Bonded Force Fields in LAMMPS},
+ journal = {J. Phys. Chem. B},
+ year =    2024,
+ volume =  128,
+ number =  13,
+ pages =   {3282–-3297}
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.23285045
+  grid = 24 24 40
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.0020796457
+  estimated relative force accuracy = 0.0001444234
+  using double precision FFTW3
+  3d grid and FFT values/proc = 13965 4032
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 16
+  ghost atom cutoff = 16
+  binsize = 8, bins = 8 8 5
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair buck/coul/long, perpetual
+      attributes: half, newton on
+      pair build: half/bin/atomonly/newton/tri
+      stencil: half/bin/3d/tri
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 6.834 | 6.974 | 7.232 Mbytes
+   Step          Temp          Press          PotEng         TotEng    
+         0   300            3354577.6      22113.513      22268.586    
+      1500   1013.8206      2351567        4513.5847      5037.64      
+Loop time of 9.33116 on 6 procs for 1500 steps with 4000 atoms
+
+Performance: 13.889 ns/day, 1.728 hours/ns, 160.752 timesteps/s, 643.007 katom-step/s
+97.8% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 7.2183     | 7.2863     | 7.3149     |   1.2 | 78.09
+Kspace  | 1.4538     | 1.4761     | 1.5499     |   2.8 | 15.82
+Neigh   | 0.26762    | 0.27659    | 0.29019    |   1.8 |  2.96
+Comm    | 0.23637    | 0.2408     | 0.24663    |   0.7 |  2.58
+Output  | 1.175e-05  | 1.5292e-05 | 2.5792e-05 |   0.0 |  0.00
+Modify  | 0.026836   | 0.027283   | 0.027776   |   0.2 |  0.29
+Other   |            | 0.02406    |            |       |  0.26
+
+Nlocal:        666.667 ave         672 max         656 min
+Histogram: 1 0 0 0 0 1 0 1 1 2
+Nghost:        14696.5 ave       14723 max       14667 min
+Histogram: 1 0 0 2 0 0 1 0 1 1
+Neighs:         489137 ave      493409 max      481104 min
+Histogram: 1 0 0 0 1 0 0 2 0 2
+
+Total # of neighbors = 2934823
+Ave neighs/atom = 733.70575
+Neighbor list builds = 9
+Dangerous builds = 0
+unfix           tl
+unfix           soft
+
+# ---------- GLOBAL PER-ATOM COMPUTES ----------
+compute         csm all centro/atom fcc
+compute         msdALL all msd
+compute         gr all rdf 200
+
+# ---------- FRACTION LADDER ----------
+variable        frac index 0.200 0.400 0.600 0.800 1.000
+label           FRAC_LOOP
+
+# Pseudo-random per-atom noise in [0,1) based on position (no chunk/atom needed)
+variable        seed equal 9999
+variable        noise atom "fmod(abs(sin((x*12.9898 + y*78.233 + z*37.719 + v_seed)*43758.5453)),1.0)"
+variable        isHot atom "v_noise < v_frac"
+
+# HOT/COLD groups for this fraction
+group           HOT variable isHot
+ERROR: Variable noise: Invalid math/group/special/feature function 'fmod()' in variable formula (src/variable.cpp:2314)
+Last command: group           HOT variable isHot

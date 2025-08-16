@@ -1,0 +1,134 @@
+LAMMPS (29 Aug 2024)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+# ---------- PREAMBLE ----------
+units           metal
+atom_style      charge
+boundary        p p p
+read_data       Li2NiGe3O8_crystal.data
+Reading data file ...
+  triclinic box = (0 0 0) to (32.758555 32.75852 32.758651) with tilt (-0.000139 -1.1e-05 -4.7e-05)
+  2 by 1 by 3 MPI processor grid
+  reading atoms ...
+  3584 atoms
+  read_data CPU = 0.018 seconds
+
+pair_style      buck/coul/long 12.0
+kspace_style    pppm 1.0e-4
+pair_modify     mix arithmetic
+pair_coeff      * * 1388.77 0.3623 0.0
+
+neighbor        4.0 bin
+neigh_modify    every 1 delay 0 check yes
+thermo          2000
+thermo_style    custom step temp press pe etotal
+
+# ---------- HELPERS ----------
+velocity        all create 300.0 12345 mom yes rot yes dist gaussian
+fix             soft all nve/limit 0.03
+fix             tl   all langevin 300.0 300.0 5.0 7777
+timestep        0.001
+run             1500
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- Type Label Framework: https://doi.org/10.1021/acs.jpcb.3c08419
+
+@Article{Gissinger24,
+ author = {Jacob R. Gissinger, Ilia Nikiforov, Yaser Afshar, Brendon Waters, Moon-ki Choi, Daniel S. Karls, Alexander Stukowski, Wonpil Im, Hendrik Heinz, Axel Kohlmeyer, and Ellad B. Tadmor},
+ title = {Type Label Framework for Bonded Force Fields in LAMMPS},
+ journal = {J. Phys. Chem. B},
+ year =    2024,
+ volume =  128,
+ number =  13,
+ pages =   {3282–-3297}
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+PPPM initialization ...
+WARNING: System is not charge neutral, net charge = -0.1024 (src/kspace.cpp:327)
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.254829
+  grid = 24 24 24
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00058448506
+  estimated relative force accuracy = 4.0590241e-05
+  using double precision FFTW3
+  3d grid and FFT values/proc = 8835 2304
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 16
+  ghost atom cutoff = 16
+  binsize = 8, bins = 5 5 5
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair buck/coul/long, perpetual
+      attributes: half, newton on
+      pair build: half/bin/atomonly/newton/tri
+      stencil: half/bin/3d/tri
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 6.39 | 6.548 | 6.822 Mbytes
+   Step          Temp          Press          PotEng         TotEng    
+         0   300            5061340.8      25136.475      25275.417    
+      1500   1195.8392      3989806.7      11375.349      11929.189    
+Loop time of 9.41007 on 6 procs for 1500 steps with 3584 atoms
+
+Performance: 13.772 ns/day, 1.743 hours/ns, 159.404 timesteps/s, 571.303 katom-step/s
+98.6% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 7.5644     | 7.7688     | 7.933      |   4.7 | 82.56
+Kspace  | 0.98972    | 1.1484     | 1.3559     |  12.2 | 12.20
+Neigh   | 0.18846    | 0.19117    | 0.19337    |   0.4 |  2.03
+Comm    | 0.25331    | 0.26076    | 0.26542    |   0.9 |  2.77
+Output  | 1.925e-05  | 5.5708e-05 | 8.3792e-05 |   0.0 |  0.00
+Modify  | 0.023358   | 0.024093   | 0.024783   |   0.3 |  0.26
+Other   |            | 0.01686    |            |       |  0.18
+
+Nlocal:        597.333 ave         611 max         586 min
+Histogram: 1 0 0 2 1 1 0 0 0 1
+Nghost:          13104 ave       13116 max       13092 min
+Histogram: 1 0 0 3 0 0 0 0 0 2
+Neighs:         522066 ave      533720 max      512749 min
+Histogram: 1 0 0 2 1 1 0 0 0 1
+
+Total # of neighbors = 3132393
+Ave neighs/atom = 873.99358
+Neighbor list builds = 9
+Dangerous builds = 0
+unfix           tl
+unfix           soft
+
+# sampling (order proxy + RDF + MSD)
+compute         csm all centro/atom fcc
+compute         cavg all reduce ave c_csm
+compute         msdall all msd
+compute         gr all rdf 200
+
+# ---- Split ave/time ----
+fix             obs all ave/time 200 1 200 c_cavg c_msdall[4] ave running file Li2NiGe3O8_obs.txt overwrite
+fix             rdf all ave/time 200 1 200 c_gr[*]            ave running file Li2NiGe3O8_rdf.txt mode vector overwrite
+# ------------------------
+
+# ---------- LOOP OVER HOT FRACTIONS ----------
+variable        nF equal 5
+variable        frac index 0.200 0.400 0.600 0.800 1.000
+
+label           fracLoop
+
+# --- (A) DEFINE HOT REGION AS RANDOM UNION OF SPHERES ---
+variable        Rs       equal 20.0           # Å
+variable        Ns       equal 10
+variable        seed     equal 9999
+
+# safe delete (only if group exists)
+variable        hot_exists equal groupbit("HOT")
+if "${hot_exists} > 0" then "group HOT delete"
+ERROR: Variable hot_exists: Invalid math/group/special/feature function 'groupbit()' in variable formula (src/variable.cpp:2314)
+Last command: ${hot_exists

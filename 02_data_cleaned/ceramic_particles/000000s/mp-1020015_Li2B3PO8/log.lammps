@@ -1,0 +1,27 @@
+LAMMPS (29 Aug 2024)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+# LAMMPS Crystal Melting Script for Li2B3PO8
+# Fast heating protocol: staged dt, tight thermostat, no Coulomb
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+
+# Read crystal
+read_data Li2B3PO8_crystal.data
+Reading data file ...
+  triclinic box = (0 0 0) to (26.357091 32.526849 39.225468) with tilt (-0.042147 -0.403026 -0.490371)
+  1 by 2 by 3 MPI processor grid
+  reading atoms ...
+  3024 atoms
+  read_data CPU = 0.056 seconds
+
+# --- MELT: NO COULOMB (Buckingham only), no kspace ---
+pair_style   buck 12.0
+pair_modify  mix arithmetic
+pair_coeff * * 1388.77 0.3623 0.0
+
+atom_modify map array
+ERROR: Atom_modify map command after simulation box is defined (src/atom.cpp:843)
+Last command: atom_modify map array

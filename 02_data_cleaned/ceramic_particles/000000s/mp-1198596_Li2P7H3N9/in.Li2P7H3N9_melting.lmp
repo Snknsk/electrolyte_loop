@@ -1,0 +1,46 @@
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+atom_modify map array
+
+# Read crystal
+read_data Li2P7H3N9_crystal.data
+
+# --- MELT: NO COULOMB (Buckingham only), no kspace ---
+pair_style   buck 12.0
+pair_modify  mix arithmetic
+pair_coeff * * 1388.77 0.3623 0.0
+
+neighbor 2.0 bin
+neigh_modify every 15 delay 0 check no
+thermo_modify lost error
+
+# Quick minimize (remove worst overlaps)
+minimize 1.0e-4 1.0e-6 500 5000
+
+# Single-stage: fast NVT ramp 300 → 3500 K
+velocity all create 300.0 12345 dist gaussian mom yes rot yes
+fix heat all nvt temp 300.0 3500 5.0
+timestep 0.0015
+fix dtr all dt/reset 100 0.001 0.0015 0.02
+
+thermo 10000
+dump 1 all custom 100000 Li2P7H3N9_melting_trajectory.dump id type x y z
+print "Starting MELTING of Li2P7H3N9: single-stage NVT 300K → 3500K over 8 ps"
+run 8000
+unfix heat
+unfix dtr
+
+# Short NPT in liquid to relax density
+fix liq all npt temp 3500 3500 10.0 iso 1.0 1.0 200.0
+timestep 0.002
+run 5000
+unfix liq
+
+# Save liquid
+write_data Li2P7H3N9_melted_liquid.data nocoeff
+write_dump all xyz Li2P7H3N9_melted_liquid.xyz modify element P N Li H
+undump 1
+
+print "MELTING COMPLETE for {formula} - liquid saved"

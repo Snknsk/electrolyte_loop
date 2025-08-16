@@ -1,0 +1,64 @@
+# LAMMPS Quenching Script for Li2Ta2OF23 - 10000 K/ps
+# ULTRAFAST quench - pure amorphous glass
+units metal
+atom_style charge
+boundary p p p
+processors * * *  # Use all available processors
+
+# Read melted/liquid structure
+read_data Li2Ta2OF23_melted_liquid.data
+
+# Define potential
+# Lennard-Jones + Coulomb potential for ceramics
+# Assigns approximate charges based on oxidation states
+
+# Set charges for each atom type
+set type 1 charge -1.0
+set type 2 charge -2.0
+set type 3 charge 0.0
+set type 4 charge 1.0
+
+# Use hybrid potential: LJ for short-range, Coulomb for long-range
+pair_style hybrid/overlay lj/cut 10.0 coul/cut 12.0
+pair_coeff * * lj/cut 0.010 3.0  # LJ parameters (epsilon=0.01 eV, sigma=3.0 Angstrom)
+pair_coeff * * coul/cut  # Coulombic interactions
+
+# Note: For better accuracy with long-range electrostatics, use:
+# pair_style hybrid/overlay lj/cut 10.0 coul/long 12.0
+# kspace_style pppm 1e-4
+# But this requires more setup and is slower
+
+# Neighbor list
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+
+# STAGE 1: QUENCH from 5000K to 300K at 10000 K/ps
+# This will take 0.5 ps
+fix 1 all npt temp 5000 300 $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+timestep 0.001
+
+# Output
+thermo 1000
+thermo_style custom step time temp press vol etotal ke pe density
+dump 1 all custom 5000 Li2Ta2OF23_quench_10000Kps_trajectory.dump id type x y z vx vy vz
+
+print "Starting QUENCH of Li2Ta2OF23 from liquid at 5000K to 300K"
+print "Cooling rate: 10000 K/ps - expecting ultrafast_glass"
+run 470
+
+# STAGE 2: Equilibrate at 300K for 50 ps
+unfix 1
+fix 1 all npt temp 300 300 $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+
+print "Equilibrating Li2Ta2OF23 quenched structure at 300K"
+run 50000
+
+# STAGE 3: Final minimization
+minimize 1.0e-4 1.0e-6 1000 10000
+
+# Save quenched structure with descriptive name
+write_data Li2Ta2OF23_quenched_10000Kps_ultrafast_glass.data
+write_dump all xyz Li2Ta2OF23_quenched_10000Kps_ultrafast_glass.xyz modify element F O Ta Li
+undump 1
+
+print "QUENCH COMPLETE for {formula} at {cooling_rate} K/ps - structure type: {structure_type}"

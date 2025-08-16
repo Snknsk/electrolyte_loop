@@ -1,0 +1,59 @@
+# LAMMPS Crystal Melting Script for Li2B3PO8
+# Fast heating protocol: staged dt, tight thermostat, no Coulomb
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+
+# Read crystal
+read_data Li2B3PO8_crystal.data
+
+# --- MELT: NO COULOMB (Buckingham only), no kspace ---
+pair_style   buck 12.0
+pair_modify  mix arithmetic
+pair_coeff * * 1388.77 0.3623 0.0
+
+atom_modify map array
+neighbor 2.5 bin
+neigh_modify every 2 delay 0 check yes
+thermo_modify lost error
+
+# Minimize
+minimize 1.0e-4 1.0e-6 1000 10000
+
+# Stage 0: gentle 5 ps @ 0.5 fs with limiter + Langevin
+velocity all create 10.0 12345 dist gaussian mom yes rot yes
+fix lim all nve/limit 0.03
+fix tl  all langevin 10.0 300.0 5.0 90210
+timestep 0.0005
+thermo 5000
+dump 1 all custom 100000 Li2B3PO8_melting_trajectory.dump id type x y z
+run 5000
+unfix lim
+unfix tl
+
+# Stage 1: fast NVT heat 300 → 3500 K, Tdamp=5 ps, 1 fs
+fix heat all nvt temp 300.0 3500 5.0
+timestep 0.001
+print "Starting MELTING of Li2B3PO8: NVT heat 300K → 3500K over 15 ps"
+run 15000
+unfix heat
+
+# Stage 2: brief NVT hold at T_melt, bump dt to 1.5 fs
+fix hold all nvt temp 3500 3500 5.0
+timestep 0.0015
+run 5000
+unfix hold
+
+# Stage 3: short NPT in liquid to relax density (Tdamp_T=10 ps, Tdamp_P=200 ps)
+fix liq all npt temp 3500 3500 10.0 iso 1.0 1.0 200.0
+timestep 0.0015
+run 10000
+unfix liq
+
+# Save liquid
+write_data Li2B3PO8_melted_liquid.data nocoeff
+write_dump all xyz Li2B3PO8_melted_liquid.xyz modify element O B P Li
+undump 1
+
+print "MELTING COMPLETE for {formula} - liquid saved"

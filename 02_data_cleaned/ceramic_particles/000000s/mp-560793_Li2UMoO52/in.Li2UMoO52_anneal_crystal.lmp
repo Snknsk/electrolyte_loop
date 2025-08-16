@@ -1,0 +1,62 @@
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+atom_modify map array
+
+# Start from the original crystal (no melt)
+read_data Li2UMoO52_crystal.data
+
+# Full electrostatics for crystalline preservation
+pair_style buck/coul/long 12.0
+kspace_style pppm 1.0e-4
+pair_modify mix arithmetic
+pair_coeff * * 1388.77 0.3623 0.0
+
+neighbor 3.0 bin
+neigh_modify every 1 delay 0 check yes
+thermo_modify lost error
+
+# Light relax
+minimize 1.0e-4 1.0e-6 500 5000
+
+# Small positional tether (release before the hold)
+fix keep all spring/self 1.0
+velocity all create 300.0 12345 mom yes rot yes dist gaussian
+
+# NVT ramp to ~0.7 Tm
+fix ramp all nvt temp 300.0 1800 5.0
+timestep 0.001
+fix dtr all dt/reset 200 0.0008 0.0012 0.02
+thermo 5000
+dump 1 all custom 100000 Li2UMoO52_anneal_trajectory.dump id type x y z
+print "CRYSTAL-ANNEAL of Li2UMoO52: 300K -> 1800K over 4.0 ps"
+run 4000
+unfix keep
+
+# Hold at peak T to anneal defects
+unfix dtr
+fix hold all nvt temp 1800 1800 5.0
+timestep 0.001
+run 30000
+unfix hold
+fix dtr2 all dt/reset 200 0.0008 0.0012 0.02
+
+# Ultra-slow NPT cool to 300 K
+fix cool all npt temp 1800 300.0 10.0 iso 1.0 1.0 200.0
+print "COOLING Li2UMoO52: 1800K -> 300K at ~5 K/ps (~300.0 ps)"
+run 300000
+unfix cool
+unfix dtr2
+
+# Final tighten
+fix fin all nvt temp 300.0 300.0 5.0
+run 10000
+unfix fin
+
+minimize 1.0e-4 1.0e-6 1000 10000
+write_data Li2UMoO52_annealed_crystalline.data
+write_dump all xyz Li2UMoO52_annealed_crystalline.xyz modify element Li O Mo U
+undump 1
+
+print "CRYSTALLINE-ANNEAL COMPLETE for Li2UMoO52"

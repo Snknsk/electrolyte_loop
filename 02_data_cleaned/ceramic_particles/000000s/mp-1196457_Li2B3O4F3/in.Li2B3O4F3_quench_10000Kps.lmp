@@ -1,0 +1,70 @@
+# LAMMPS Quenching Script for Li2B3O4F3 - 10000 K/ps
+# ULTRAFAST quench - pure amorphous glass
+units metal
+atom_style charge
+boundary p p p
+processors * * *  # Use all available processors
+
+# FIRST: Read structure to define box
+read_data Li2B3O4F3_melted_liquid.data
+
+# THEN: Define potential (after box is defined)
+# Born-Mayer/Buckingham potential for ionic materials
+# Combines electrostatic (Coulomb) with short-range repulsion
+
+# Set oxidation state charges
+set type 1 charge 3.0
+set type 2 charge -1.0
+set type 3 charge -2.0
+set type 4 charge 1.0
+
+# Use hybrid: Buckingham (short-range) + Coulomb (long-range)
+# Buck: A*exp(-r/rho) - C/r^6
+pair_style buck/coul/long 10.0
+kspace_style pppm 1.0e-5
+
+# Default Buckingham parameters for ionic solids
+# These prevent collapse while allowing Coulomb to dominate
+# A=1000 (repulsion strength), rho=0.35 (repulsion range), C=0 (no vdW)
+# NOTE: pair_coeff will be set after read_data in the script
+
+# NOW set pair coefficients (after both pair_style and read_data)
+# REDUCED STRENGTH for realistic materials!
+# D0=1.0 eV (realistic bonds), alpha=1.5, r0=2.8 Angstrom
+pair_coeff * * 1.0 1.5 2.8
+
+# Neighbor list
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+
+# STAGE 1: QUENCH from 3500K to 300K at 10000 K/ps
+# This will take 0.3 ps
+# Use NVT to maintain density during cooling
+fix 1 all nvt temp 3500 300 $(100.0*dt)
+timestep 0.001
+
+# Output
+thermo 1000
+thermo_style custom step time temp press vol etotal ke pe density
+dump 1 all custom 5000 Li2B3O4F3_quench_10000Kps_trajectory.dump id type x y z vx vy vz
+
+print "Starting QUENCH of Li2B3O4F3 from liquid at 3500K to 300K"
+print "Cooling rate: 10000 K/ps - expecting ultrafast_glass"
+run 320
+
+# STAGE 2: Equilibrate at 300K for 50 ps
+unfix 1
+fix 1 all nvt temp 300 300 $(100.0*dt)
+
+print "Equilibrating Li2B3O4F3 quenched structure at 300K"
+run 50000
+
+# STAGE 3: Final minimization
+minimize 1.0e-4 1.0e-6 1000 10000
+
+# Save quenched structure with descriptive name
+write_data Li2B3O4F3_quenched_10000Kps_ultrafast_glass.data
+write_dump all xyz Li2B3O4F3_quenched_10000Kps_ultrafast_glass.xyz modify element B F O Li
+undump 1
+
+print "QUENCH COMPLETE for {formula} at {cooling_rate} K/ps - structure type: {structure_type}"

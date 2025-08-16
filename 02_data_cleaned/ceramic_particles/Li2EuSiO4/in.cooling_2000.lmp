@@ -1,0 +1,57 @@
+# LAMMPS Cooling Script - 2000 K/ps
+units metal
+atom_style charge
+boundary p p p
+processors * * *  # Use all available processors
+
+# Read heated structure
+read_data heated.data
+
+# Define potential
+# Lennard-Jones + Coulomb potential for ceramics
+# Assigns approximate charges based on oxidation states
+
+# Set charges for each atom type
+set type 1 charge 0.0
+set type 2 charge 1.0
+set type 3 charge -2.0
+set type 4 charge 4.0
+
+# Use hybrid potential: LJ for short-range, Coulomb for long-range
+pair_style hybrid/overlay lj/cut 10.0 coul/cut 12.0
+pair_coeff * * lj/cut 0.010 3.0  # LJ parameters (epsilon=0.01 eV, sigma=3.0 Angstrom)
+pair_coeff * * coul/cut  # Coulombic interactions
+
+# Note: For better accuracy with long-range electrostatics, use:
+# pair_style hybrid/overlay lj/cut 10.0 coul/long 12.0
+# kspace_style pppm 1e-4
+# But this requires more setup and is slower
+
+# Neighbor list
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+
+# NPT cooling from 4000K to 300K at 2000 K/ps
+fix 1 all npt temp 4000 300 $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+timestep 0.001
+
+# Output
+thermo 100
+thermo_style custom step temp press vol etotal ke pe density
+dump 1 all custom 1000 cooling_2000_traj.dump id type x y z vx vy vz
+
+# Run cooling for 1.9 ps (1850 steps)
+run 1850
+
+# Final minimization at 300K
+unfix 1
+fix 1 all npt temp 300 300 $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+run 10000
+minimize 1.0e-4 1.0e-6 1000 10000
+
+# Save cooled structure
+write_data cooled_2000.data
+write_dump all xyz cooled_2000.xyz modify element Eu Li O Si
+undump 1
+
+print "Cooling complete at {cooling_rate} K/ps - final temperature: $(temp)K"

@@ -1,0 +1,105 @@
+# ---------- PREAMBLE ----------
+units           metal
+atom_style      charge
+boundary        p p p
+read_data       Li2FeGeO4_crystal.data
+
+pair_style      buck/coul/long 12.0
+kspace_style    pppm 1.0e-4
+pair_modify     mix arithmetic
+pair_coeff      * * 1388.77 0.3623 0.0
+
+neighbor        4.0 bin
+neigh_modify    every 1 delay 0 check yes
+thermo          2000
+thermo_style    custom step temp press pe etotal
+thermo_modify   lost error
+
+# ---------- SOFT START ----------
+velocity        all create 300.0 12345 mom yes rot yes dist gaussian
+fix             soft all nve/limit 0.03
+fix             tl   all langevin 300.0 300.0 5.0 7777
+timestep        0.001
+run             1500
+unfix           tl
+unfix           soft
+
+# ---------- GLOBAL PER-ATOM COMPUTES ----------
+compute         csm all centro/atom fcc
+compute         msdALL all msd
+compute         gr all rdf 200
+
+# ---------- FRACTION LADDER ----------
+variable        frac index 0.200 0.400 0.600 0.800 1.000
+label           FRAC_LOOP
+
+# Pseudo-random per-atom noise in [0,1) based on position (no chunk/atom needed)
+variable        seed equal 9999
+variable        ph   atom "abs(sin((x*12.9898 + y*78.233 + z*37.719 + v_seed)*43758.5453))"
+variable        noise atom "v_ph - floor(v_ph)"
+variable        isHot atom "v_noise < v_frac"
+
+# HOT/COLD groups for this fraction
+group           HOT variable isHot
+group           COLD subtract all HOT
+
+# Report selection
+variable        nAll equal count(all)
+variable        nHot equal count(HOT)
+print           "Selected HOT ~ ${nHot}/${nAll} atoms (target fraction = ${frac})"
+
+# ---------- PER-FRACTION SAMPLING ----------
+compute         cavgHOT HOT reduce ave c_csm
+fix             fobs all ave/time 200 1 200 c_msdALL[4] c_cavgHOT ave running file Li2FeGeO4_frac_${frac}_obs.txt overwrite
+fix             frdf all ave/time 200 1 200 c_gr[*] ave running file Li2FeGeO4_frac_${frac}_rdf.txt mode vector overwrite
+
+# ---------- SPLIT HEAT ----------
+variable        Thot  equal 4000.0
+variable        Tcold equal 300.0
+
+fix             fH HOT  nvt temp ${Tcold} ${Thot} 5.0
+fix             fC COLD nvt temp ${Tcold} ${Tcold} 5.0
+fix             dtr all dt/reset 200 0.0008 0.0012 0.02
+dump            dH HOT  custom 1000 Li2FeGeO4_frac_${frac}_HOT.lammpstrj  id type x y z
+dump            dC COLD custom 1000 Li2FeGeO4_frac_${frac}_COLD.lammpstrj id type x y z
+dump_modify     dH sort id
+dump_modify     dC sort id
+
+run             20000
+unfix           dtr
+run             20000
+
+# ---------- FAST QUENCH HOT -> 900 K ----------
+unfix           fH
+fix             fH HOT nvt temp ${Thot} 900.0 5.0
+run             50000
+
+# Merge thermostats
+unfix           fH
+unfix           fC
+undump          dH
+undump          dC
+
+# ---------- WHOLE-BOX NPT COOL 900 -> 300 ----------
+fix             cool all npt temp 900.0 300.0 10.0 iso 1.0 1.0 200.0
+fix             dtr2 all dt/reset 200 0.0008 0.0012 0.02
+dump            box all custom 2000 Li2FeGeO4_frac_${frac}_BOX.lammpstrj id type x y z
+dump_modify     box sort id
+run             200000
+unfix           dtr2
+unfix           cool
+undump          box
+
+# ---------- FINAL RELAX + SAVE ----------
+minimize        1.0e-4 1.0e-6 1000 10000
+write_data      Li2FeGeO4_out_frac_${frac}.data
+write_dump      all xyz Li2FeGeO4_out_frac_${frac}.xyz modify element Ge Li O Fe
+
+# Teardown per-fraction sampling
+unfix           fobs
+unfix           frdf
+uncompute       cavgHOT
+
+# Next fraction
+next            frac
+jump            SELF FRAC_LOOP

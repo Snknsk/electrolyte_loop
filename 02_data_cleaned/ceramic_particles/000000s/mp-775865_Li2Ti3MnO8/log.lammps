@@ -1,0 +1,181 @@
+LAMMPS (29 Aug 2024)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+# LAMMPS Crystal Melting Script for Li2Ti3MnO8
+# Stable heating protocol: NVT first, then NPT after liquid forms
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+
+# Read CRYSTAL structure (charges may be present in data file, but we disable Coulomb here)
+read_data Li2Ti3MnO8_crystal.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (34.106564 34.106564 34.106564)
+  1 by 2 by 3 MPI processor grid
+  reading atoms ...
+  3584 atoms
+  read_data CPU = 0.020 seconds
+
+# --- MELT: NO COULOMB (Buckingham only), no kspace ---
+pair_style   buck 12.0
+pair_modify  mix arithmetic
+# Generic oxide Buckingham (CLAYFF-compatible)
+pair_coeff * * 1388.77 0.3623 0.0
+
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+thermo_modify lost error
+
+# Initial minimization
+minimize 1.0e-4 1.0e-6 1000 10000
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- Type Label Framework: https://doi.org/10.1021/acs.jpcb.3c08419
+
+@Article{Gissinger24,
+ author = {Jacob R. Gissinger, Ilia Nikiforov, Yaser Afshar, Brendon Waters, Moon-ki Choi, Daniel S. Karls, Alexander Stukowski, Wonpil Im, Hendrik Heinz, Axel Kohlmeyer, and Ellad B. Tadmor},
+ title = {Type Label Framework for Bonded Force Fields in LAMMPS},
+ journal = {J. Phys. Chem. B},
+ year =    2024,
+ volume =  128,
+ number =  13,
+ pages =   {3282â€“-3297}
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 14
+  ghost atom cutoff = 14
+  binsize = 7, bins = 5 5 5
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair buck, perpetual
+      attributes: half, newton on
+      pair build: half/bin/atomonly/newton
+      stencil: half/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 5.651 | 5.894 | 6.034 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0              50310.804      0              50310.804      4072391.9    
+         5   0              47758.585      0              47758.585      3890348.4    
+Loop time of 0.0466762 on 6 procs for 5 steps with 3584 atoms
+
+98.1% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      50310.8038794906   47762.3262201272   47758.5847870586
+  Force two-norm initial, final = 644.84105 20.767724
+  Force max component initial, final = 12.406721 0.38229428
+  Final line search alpha, max atom move = 0.40905389 0.15637896
+  Iterations, force evaluations = 5 9
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.034689   | 0.039255   | 0.043551   |   1.6 | 84.10
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.0026279  | 0.0068787  | 0.011444   |   3.8 | 14.74
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.0005421  |            |       |  1.16
+
+Nlocal:        597.333 ave         656 max         568 min
+Histogram: 4 0 0 0 0 0 0 0 0 2
+Nghost:           9750 ave        9894 max        9470 min
+Histogram: 2 0 0 0 0 0 0 0 0 4
+Neighs:         315221 ave      345672 max      284032 min
+Histogram: 2 0 0 0 0 2 0 0 0 2
+
+Total # of neighbors = 1891328
+Ave neighs/atom = 527.71429
+Neighbor list builds = 0
+Dangerous builds = 0
+
+# Gentle startup with velocity limiting
+velocity all create 10.0 12345 dist gaussian mom yes rot yes
+fix lim all nve/limit 0.05
+fix tl  all langevin 10.0 300.0 100.0 90210
+timestep 0.001
+run 10000
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Per MPI rank memory allocation (min/avg/max) = 4.531 | 4.772 | 4.911 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         5   10             47758.585      0              47763.216      3890473      
+     10005   1423.5768      32799.6        0              33458.914      3075969.1    
+Loop time of 38.7468 on 6 procs for 10000 steps with 3584 atoms
+
+Performance: 22.299 ns/day, 1.076 hours/ns, 258.086 timesteps/s, 924.979 katom-step/s
+98.6% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 30.148     | 32.791     | 35.083     |  33.8 | 84.63
+Neigh   | 1.0937     | 1.1112     | 1.1422     |   1.5 |  2.87
+Comm    | 2.2252     | 4.5487     | 7.2074     |  91.2 | 11.74
+Output  | 2.4459e-05 | 2.832e-05  | 3.6084e-05 |   0.0 |  0.00
+Modify  | 0.15057    | 0.15482    | 0.1572     |   0.6 |  0.40
+Other   |            | 0.1411     |            |       |  0.36
+
+Nlocal:        597.333 ave         602 max         591 min
+Histogram: 1 1 0 0 1 0 0 0 0 3
+Nghost:           9349 ave        9385 max        9298 min
+Histogram: 1 0 0 0 1 1 0 1 1 1
+Neighs:         308907 ave      328225 max      290429 min
+Histogram: 2 0 0 0 1 1 0 0 0 2
+
+Total # of neighbors = 1853444
+Ave neighs/atom = 517.14397
+Neighbor list builds = 162
+Dangerous builds = 0
+unfix lim
+unfix tl
+
+# Gradual HEAT under NVT (constant volume)
+fix heat all nvt temp 300.0 4500 100.0
+timestep 0.001
+thermo 1000
+thermo_style custom step time temp press vol etotal ke pe density
+WARNING: New thermo_style command, previous thermo_modify settings will be lost (src/output.cpp:904)
+dump 1 all custom 50000 Li2Ti3MnO8_melting_trajectory.dump id type x y z vx vy vz
+print "Starting MELTING of Li2Ti3MnO8: NVT heating 300K â†’ 4500K"
+WARNING: Detected non-ASCII characters in input. Will try to continue by replacing with ASCII equivalents where known. (src/input.cpp:478)
+Starting MELTING of Li2Ti3MnO8: NVT heating 300K †’ 4500K
+run 100000
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Per MPI rank memory allocation (min/avg/max) = 4.876 | 4.9 | 4.912 Mbytes
+   Step          Time           Temp          Press          Volume         TotEng         KinEng         PotEng        Density    
+     10005   10.005         1423.5768      3075969.1      39674.723      33458.914      659.31405      32799.6        3.6474168    
+     11000   11             1423.1015      3075836.9      39674.723      33458.718      659.09395      32799.624      3.6474168    
+     12000   12             1451.7877      3075292        39674.723      33458.038      672.37966      32785.658      3.6474168    
+     13000   13             1469.8432      3075057        39674.723      33456.986      680.74185      32776.244      3.6474168    
+     14000   14             1509.3918      3074425.6      39674.723      33455.532      699.05834      32756.474      3.6474168    
+     15000   15             1508.9829      3074362.9      39674.723      33453.874      698.86899      32755.005      3.6474168    
+     16000   16             1539.9718      3073769.3      39674.723      33451.907      713.22115      32738.686      3.6474168    
+     17000   17             1548.0663      3073523.1      39674.723      33449.807      716.97003      32732.837      3.6474168    
+     18000   18             1559.3054      3073151.8      39674.723      33447.648      722.17529      32725.473      3.6474168    
+     19000   19             1542.5761      3073339.5      39674.723      33445.494      714.4273       32731.066      3.6474168    
+     20000   20             1561.5204      3072863.5      39674.723      33443.445      723.20115      32720.244      3.6474168    
+     21000   21             1542.2657      3073060.9      39674.723      33441.565      714.28354      32727.281      3.6474168    
+     22000   22             1522.2905      3073358        39674.723      33439.707      705.03226      32734.674      3.6474168    
+     23000   23             1545.1831      3072860.9      39674.723      33437.969      715.63472      32722.334      3.6474168    
+     24000   24             1573.036       3072282.4      39674.723      33436.408      728.53447      32707.873      3.6474168    
+     25000   25             1577.7541      3072346.6      39674.723      33434.884      730.71963      32704.164      3.6474168    
+     26000   26             1628.7945      3071228        39674.723      33433.41       754.35841      32679.051      3.6474168    
+     27000   27             1642.743       3071097.6      39674.723      33431.956      760.81849      32671.138      3.6474168    
+     28000   28             1655.8909      3070641        39674.723      33430.683      766.90781      32663.775      3.6474168    
+     29000   29             1685.8353      3070174.6      39674.723      33429.31       780.77623      32648.534      3.6474168    
+     30000   30             1671.0122      3070414.3      39674.723      33427.952      773.91109      32654.041      3.6474168    
+     31000   31             1674.6356      3070160.2      39674.723      33426.874      775.58921      32651.285      3.6474168    
+     32000   32             1752.0626      3068872.3      39674.723      33425.412      811.44869      32613.963      3.6474168    
+     33000   33             1723.4364      3069377.7      39674.723      33424.214      798.19079      32626.024      3.6474168    
+ 

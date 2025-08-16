@@ -1,0 +1,115 @@
+# ---------- PREAMBLE ----------
+units           metal
+atom_style      charge
+boundary        p p p
+read_data       SrLi2SiN22_crystal.data
+
+pair_style      buck/coul/long 12.0
+kspace_style    pppm 1.0e-4
+pair_modify     mix arithmetic
+pair_coeff      * * 1388.77 0.3623 0.0
+
+neighbor        4.0 bin
+neigh_modify    every 1 delay 0 check yes
+thermo          2000
+thermo_style    custom step temp press pe etotal
+
+# ---------- HELPERS ----------
+velocity        all create 300.0 12345 mom yes rot yes dist gaussian
+fix             soft all nve/limit 0.03
+fix             tl   all langevin 300.0 300.0 5.0 7777
+timestep        0.001
+run             1500
+unfix           tl
+unfix           soft
+
+# sampling (order proxy + RDF + MSD)
+compute         csm all centro/atom fcc
+compute         cavg all reduce ave c_csm
+compute         msdall all msd
+compute         gr all rdf 200
+
+# ---- FIXED: split ave/time ----
+# scalars (centrosymmetry avg and MSD[4])
+fix             obs all ave/time 200 1 200 c_cavg c_msdall[4] ave running file SrLi2SiN22_obs.txt overwrite
+# RDF array on its own line, with 'mode vector'
+fix             rdf all ave/time 200 1 200 c_gr[*] ave running file SrLi2SiN22_rdf.txt mode vector overwrite
+# --------------------------------
+
+# ---------- LOOP OVER HOT FRACTIONS ----------
+variable        nF equal 5
+variable        frac index 0.200 0.400 0.600 0.800 1.000
+
+label           fracLoop
+
+# --- (A) DEFINE HOT REGION AS RANDOM UNION OF SPHERES ---
+variable        Rs       equal 20.0           # Å
+variable        Ns       equal 10
+variable        seed     equal 9999
+
+group           HOT delete
+group           COLD delete
+
+variable        Lx equal xhi-xlo
+variable        Ly equal yhi-ylo
+variable        Lz equal zhi-zlo
+
+variable        i loop ${Ns}
+label           mk
+  variable xr equal xlo + ${Lx}*random(0.0,1.0,${seed}+${i})
+  variable yr equal ylo + ${Ly}*random(0.0,1.0,${seed}+2*${i})
+  variable zr equal zlo + ${Lz}*random(0.0,1.0,${seed}+3*${i})
+  region   sph_${i} sphere ${xr} ${yr} ${zr} ${Rs} units box
+  if "${i} == 1" then "group HOT region sph_${i}"                   else "group HOT union HOT region sph_${i}"
+next            i
+jump            SELF mk
+
+group           COLD subtract all HOT
+
+variable        nAll equal count(all)
+variable        nHot equal count(HOT)
+print           "Selected HOT ~ ${nHot}/${nAll} atoms (target fraction = ${frac})"
+
+# --- (C) SPLIT THERMOSTATS: HEAT ONLY HOT ---
+variable        Thot  equal 4000.0
+variable        Tcold equal 300.0
+
+fix             fH HOT  nvt temp ${Tcold} ${Thot} 5.0
+fix             fC COLD nvt temp ${Tcold} ${Tcold} 5.0
+fix             dtr all dt/reset 200 0.0008 0.0012 0.02
+dump            dH HOT custom 200 SrLi2SiN22_frac_${frac}_HOT.lammpstrj id type x y z
+dump            dC COLD custom 200 SrLi2SiN22_frac_${frac}_COLD.lammpstrj id type x y z
+dump_modify     dH sort id
+dump_modify     dC sort id
+
+run             20000
+unfix           dtr
+run             20000
+
+# --- (D) QUENCH HOT -> 900 K FAST ---
+fix_modify      fH temp ${Thot} 900.0 5.0
+run             50000
+
+# merge groups and equilibrate the whole system
+unfix           fH
+unfix           fC
+undump          dH
+undump          dC
+
+# --- (E) WHOLE-SYSTEM NPT COOL 900 -> 300 K ---
+fix             cool all npt temp 900.0 300.0 10.0 iso 1.0 1.0 200.0
+fix             dtr2 all dt/reset 200 0.0008 0.0012 0.02
+dump            box all custom 1000 SrLi2SiN22_frac_${frac}_BOX.lammpstrj id type x y z
+dump_modify     box sort id
+run             200000
+unfix           dtr2
+unfix           cool
+undump          box
+
+# --- (F) FINAL RELAX + SAVE ---
+minimize        1.0e-4 1.0e-6 1000 10000
+write_data      SrLi2SiN22_out_frac_${frac}.data
+write_dump      all xyz SrLi2SiN22_out_frac_${frac}.xyz modify element Sr Li N Si
+
+next            frac
+jump            SELF fracLoop

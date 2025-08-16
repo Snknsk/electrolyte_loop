@@ -1,0 +1,48 @@
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+atom_modify map array
+
+# Read CHARGED liquid structure
+read_data Li2UMoO52_melted_liquid_charged.data
+
+# Potential (charges in data file)
+pair_style      buck/coul/long 12.0
+kspace_style    pppm 1.0e-4
+pair_modify     mix arithmetic
+pair_coeff * *  1388.77 0.3623 0.0
+
+neighbor 2.5 bin
+neigh_modify every 2 delay 0 check yes
+thermo_modify lost error
+
+# Gentle start
+fix lim all nve/limit 0.03
+fix tl  all langevin 5000 5000 5.0 13579
+timestep 0.001
+thermo 5000
+dump 1 all custom 100000 Li2UMoO52_quench_500Kps.dump id type x y z
+run 5000
+unfix lim
+unfix tl
+
+# NPT quench (Tdamp_T = 10 ps, Tdamp_P = 200 ps)
+fix 1 all npt temp 5000 300 10.0 iso 1.0 1.0 200.0
+print "Starting QUENCH of Li2UMoO52 from 5000K to 300K at 500 K/ps  (~9.4 ps)"
+run 9400
+unfix 1
+
+# Final NVT equilibration
+fix 2 all nvt temp 300 300 5.0
+run 30000
+unfix 2
+
+# Final minimize + write
+minimize 1.0e-4 1.0e-6 1000 10000
+write_data Li2UMoO52_quenched_500Kps_mostly_amorphous.data
+write_dump all xyz Li2UMoO52_quenched_500Kps_mostly_amorphous.xyz modify element Li O Mo U
+undump 1
+
+print "QUENCH COMPLETE for Li2UMoO52 at 500 K/ps - structure type: mostly_amorphous"
+    

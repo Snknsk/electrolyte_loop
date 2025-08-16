@@ -1,0 +1,61 @@
+# LAMMPS Crystal Melting Script for Li2Ti3MnO8
+# Stable heating protocol: NVT first, then NPT after liquid forms
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+
+# Read CRYSTAL structure (charges may be present in data file, but we disable Coulomb here)
+read_data Li2Ti3MnO8_crystal.data
+
+# --- MELT: NO COULOMB (Buckingham only), no kspace ---
+pair_style   buck 12.0
+pair_modify  mix arithmetic
+# Generic oxide Buckingham (CLAYFF-compatible)
+pair_coeff * * 1388.77 0.3623 0.0
+
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+thermo_modify lost error
+
+# Initial minimization
+minimize 1.0e-4 1.0e-6 1000 10000
+
+# Gentle startup with velocity limiting
+velocity all create 10.0 12345 dist gaussian mom yes rot yes
+fix lim all nve/limit 0.05
+fix tl  all langevin 10.0 300.0 100.0 90210
+timestep 0.001
+run 10000
+unfix lim
+unfix tl
+
+# Gradual HEAT under NVT (constant volume)
+fix heat all nvt temp 300.0 4500 100.0
+timestep 0.001
+thermo 1000
+thermo_style custom step time temp press vol etotal ke pe density
+dump 1 all custom 50000 Li2Ti3MnO8_melting_trajectory.dump id type x y z vx vy vz
+print "Starting MELTING of Li2Ti3MnO8: NVT heating 300K → 4500K"
+run 100000
+unfix heat
+
+# HOLD liquid at T_melt (still NVT)
+fix hold all nvt temp 4500 4500 100.0
+print "Equilibrating Li2Ti3MnO8 at 4500K (NVT) to ensure full melt"
+run 50000
+unfix hold
+
+# Brief NPT in liquid to relax volume (still no Coulomb)
+fix liq all npt temp 4500 4500 100.0 iso 1.0 1.0 1000.0
+print "Final liquid equilibration under NPT"
+timestep 0.001
+run 20000
+unfix liq
+
+# Save melted/liquid structure
+write_data Li2Ti3MnO8_melted_liquid.data nocoeff
+write_dump all xyz Li2Ti3MnO8_melted_liquid.xyz modify element O Mn Ti Li
+undump 1
+
+print "MELTING COMPLETE for {formula} - crystal is now liquid at $(temp)K"

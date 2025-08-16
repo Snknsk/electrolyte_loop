@@ -1,0 +1,65 @@
+# LAMMPS Crystal Melting Script
+# Takes ordered crystal structure and melts it at high temperature
+units metal
+atom_style charge
+boundary p p p
+processors * * *  # Use all available processors
+
+# Read CRYSTAL structure from Materials Project
+read_data crystal_structure.data
+
+# Define potential
+# Lennard-Jones + Coulomb potential for ceramics
+# Assigns approximate charges based on oxidation states
+
+# Set charges for each atom type
+set type 1 charge 1.0
+set type 2 charge 0.0
+set type 3 charge 4.0
+set type 4 charge -2.0
+
+# Use hybrid potential: LJ for short-range, Coulomb for long-range
+pair_style hybrid/overlay lj/cut 10.0 coul/cut 12.0
+pair_coeff * * lj/cut 0.010 3.0  # LJ parameters (epsilon=0.01 eV, sigma=3.0 Angstrom)
+pair_coeff * * coul/cut  # Coulombic interactions
+
+# Note: For better accuracy with long-range electrostatics, use:
+# pair_style hybrid/overlay lj/cut 10.0 coul/long 12.0
+# kspace_style pppm 1e-4
+# But this requires more setup and is slower
+
+# Neighbor list
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+
+# Initial minimization of crystal
+minimize 1.0e-4 1.0e-6 1000 10000
+
+# Initial velocities
+velocity all create 300 12345 dist gaussian mom yes rot yes
+
+# STAGE 1: Heat crystal from 300K to 4000K over 100 ps
+fix 1 all npt temp 300 4000 $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+timestep 0.001
+
+# Output
+thermo 1000
+thermo_style custom step time temp press vol etotal ke pe density
+dump 1 all custom 5000 melting_trajectory.dump id type x y z vx vy vz
+
+print "Starting MELTING: heating crystal from 300K to 4000K"
+run 100000
+
+# STAGE 2: Hold at 4000K for 50 ps to ensure fully melted
+unfix 1
+fix 1 all npt temp 4000 4000 $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+
+print "Equilibrating MELT at 4000K for 50 ps"
+run 50000
+
+# Save melted/liquid structure
+write_data melted_liquid.data
+write_dump all xyz melted_liquid.xyz modify element Li Eu Si O
+undump 1
+
+print "MELTING COMPLETE - crystal is now liquid at $(temp)K"

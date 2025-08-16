@@ -1,0 +1,79 @@
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+atom_modify map array
+comm_modify vel yes
+
+read_data Li2CrFeO4_crystal.data
+box tilt large
+
+# Full electrostatics
+pair_style buck/coul/long 12.0
+kspace_style pppm 1.0e-4
+pair_modify mix arithmetic
+pair_coeff * * 1388.77 0.3623 0.0
+
+neighbor 4.0 bin
+neigh_modify every 1 delay 0 check yes
+thermo_modify lost error
+
+# RDF during anneal
+compute gr all rdf 200 10.0
+fix frdf all ave/time 200 1 200 c_gr[*] file Li2CrFeO4_anneal_rdf.txt mode vector overwrite
+
+# Light relax
+minimize 1.0e-4 1.0e-6 500 5000
+
+# Gentle limiter for 1.5 ps to avoid shock
+velocity all create 300.0 12345 mom yes rot yes dist gaussian
+fix lim all nve/limit 0.03
+fix tl  all langevin 300.0 300.0 5.0 7777
+timestep 0.001
+run 1500
+unfix tl
+unfix lim
+
+# Small positional tether during ramp only
+fix keep all spring/self 1.0
+
+# NVT ramp to ~0.7 Tm
+fix ramp all nvt temp 300.0 1400 5.0
+timestep 0.001
+fix dtr all dt/reset 200 0.0008 0.0012 0.02
+thermo 5000
+dump 1 all custom 100000 Li2CrFeO4_anneal_trajectory.dump id type x y z
+print "CRYSTAL-ANNEAL of Li2CrFeO4: 300K -> 1400K over 4.0 ps"
+run 4000
+
+# <<< IMPORTANT: remove ramp integrator BEFORE starting the hold >>>
+unfix ramp
+unfix keep
+unfix dtr
+
+# Hold at peak T to anneal defects (single integrator)
+fix hold all nvt temp 1400 1400 5.0
+timestep 0.001
+run 30000
+unfix hold
+
+# Ultra-slow NPT cool to 300 K
+fix dtr2 all dt/reset 200 0.0008 0.0012 0.02
+fix cool all npt temp 1400 300.0 10.0 iso 1.0 1.0 200.0
+print "COOLING Li2CrFeO4: 1400K -> 300K at ~5 K/ps (~220.0 ps)"
+run 220000
+unfix cool
+unfix dtr2
+
+# Final tighten
+fix fin all nvt temp 300.0 300.0 5.0
+run 10000
+unfix fin
+
+minimize 1.0e-4 1.0e-6 1000 10000
+unfix frdf
+write_data Li2CrFeO4_annealed_crystalline.data
+write_dump all xyz Li2CrFeO4_annealed_crystalline.xyz modify element O Li Cr Fe
+undump 1
+
+print "CRYSTALLINE-ANNEAL COMPLETE for Li2CrFeO4"

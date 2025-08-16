@@ -1,0 +1,46 @@
+
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+atom_modify map array
+comm_modify vel yes
+
+read_data Rb2Li2SiO4_melted_liquid_charged.data
+
+pair_style      buck/coul/long 12.0
+kspace_style    pppm 1.0e-4
+pair_modify     mix arithmetic
+pair_coeff * *  1388.77 0.3623 0.0
+
+neighbor 4.0 bin
+neigh_modify every 1 delay 0 check yes
+thermo_modify lost error
+
+# --- Stage A: fast NPT to suppress early nucleation ---
+compute gr all rdf 200
+fix frdfa all ave/time 200 1 200 c_gr[*] ave running file Rb2Li2SiO4_quench_A500_rdfq6.txt mode vector overwrite
+fix qa all npt temp 3500 900 10.0 iso 1.0 1.0 200.0
+fix dtra all dt/reset 200 0.0008 0.0012 0.02
+thermo 5000
+dump qA all custom 1040 Rb2Li2SiO4_quench_A500.dump id type x y z
+dump_modify qA sort id
+run 5200
+undump qA
+unfix qa
+unfix dtra
+
+# --- Stage B: slow NPT to relax without ordering ---
+fix qb all npt temp 900 300 10.0 iso 1.0 1.0 300.0
+fix dtrb all dt/reset 200 0.0008 0.0012 0.02
+dump qB all custom 24000 Rb2Li2SiO4_quench_B5.dump id type x y z
+dump_modify qB sort id
+run 120000
+undump qB
+unfix qb
+unfix dtrb
+
+unfix frdfa
+minimize 1.0e-4 1.0e-6 1000 10000
+write_data Rb2Li2SiO4_quenched_A500_B5.data
+write_dump all xyz Rb2Li2SiO4_quenched_A500_B5.xyz modify element Si O Rb Li

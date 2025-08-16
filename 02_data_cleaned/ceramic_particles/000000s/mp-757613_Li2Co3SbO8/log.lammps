@@ -1,0 +1,118 @@
+LAMMPS (29 Aug 2024)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+# ---------- PREAMBLE ----------
+units           metal
+atom_style      charge
+boundary        p p p
+read_data       Li2Co3SbO8_crystal.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (33.0353 33.0353 33.0353)
+  1 by 2 by 3 MPI processor grid
+  reading atoms ...
+  3584 atoms
+  read_data CPU = 0.023 seconds
+
+pair_style      buck/coul/long 12.0
+kspace_style    pppm 1.0e-4
+pair_modify     mix arithmetic
+pair_coeff      * * 1388.77 0.3623 0.0
+
+neighbor        4.0 bin
+neigh_modify    every 1 delay 0 check yes
+thermo          2000
+thermo_style    custom step temp press pe etotal
+thermo_modify   lost error
+
+# ---------- SOFT START ----------
+velocity        all create 300.0 12345 mom yes rot yes dist gaussian
+fix             soft all nve/limit 0.03
+fix             tl   all langevin 300.0 300.0 5.0 7777
+timestep        0.001
+run             1500
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- Type Label Framework: https://doi.org/10.1021/acs.jpcb.3c08419
+
+@Article{Gissinger24,
+ author = {Jacob R. Gissinger, Ilia Nikiforov, Yaser Afshar, Brendon Waters, Moon-ki Choi, Daniel S. Karls, Alexander Stukowski, Wonpil Im, Hendrik Heinz, Axel Kohlmeyer, and Ellad B. Tadmor},
+ title = {Type Label Framework for Bonded Force Fields in LAMMPS},
+ journal = {J. Phys. Chem. B},
+ year =    2024,
+ volume =  128,
+ number =  13,
+ pages =   {3282–-3297}
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+PPPM initialization ...
+WARNING: System is not charge neutral, net charge = 0.0512 (src/kspace.cpp:327)
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.23594559
+  grid = 18 18 18
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.0012393955
+  estimated relative force accuracy = 8.6071251e-05
+  using double precision FFTW3
+  3d grid and FFT values/proc = 5200 972
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 16
+  ghost atom cutoff = 16
+  binsize = 8, bins = 5 5 5
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair buck/coul/long, perpetual
+      attributes: half, newton on
+      pair build: half/bin/atomonly/newton
+      stencil: half/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 6.116 | 6.358 | 6.503 Mbytes
+   Step          Temp          Press          PotEng         TotEng    
+         0   300            4950653.9      38667.97       38806.911    
+      1500   1195.1682      3870093.8      23577.126      24130.655    
+Loop time of 9.05755 on 6 procs for 1500 steps with 3584 atoms
+
+Performance: 14.309 ns/day, 1.677 hours/ns, 165.608 timesteps/s, 593.538 katom-step/s
+97.8% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 6.805      | 7.3515     | 7.7283     |  14.2 | 81.16
+Kspace  | 0.92154    | 1.3022     | 1.849      |  34.0 | 14.38
+Neigh   | 0.06975    | 0.071354   | 0.073711   |   0.5 |  0.79
+Comm    | 0.28287    | 0.28472    | 0.28706    |   0.2 |  3.14
+Output  | 1.2167e-05 | 1.6757e-05 | 2.8542e-05 |   0.0 |  0.00
+Modify  | 0.024405   | 0.024588   | 0.024888   |   0.1 |  0.27
+Other   |            | 0.02315    |            |       |  0.26
+
+Nlocal:        597.333 ave         600 max         593 min
+Histogram: 1 0 0 0 1 0 0 2 1 1
+Nghost:          12930 ave       12962 max       12905 min
+Histogram: 1 1 0 0 1 2 0 0 0 1
+Neighs:         509016 ave      538532 max      477172 min
+Histogram: 2 0 0 0 0 2 0 0 0 2
+
+Total # of neighbors = 3054097
+Ave neighs/atom = 852.1476
+Neighbor list builds = 8
+Dangerous builds = 0
+unfix           tl
+unfix           soft
+
+# ---------- GLOBAL COMPUTES / SAMPLING ----------
+compute         csm all centro/atom fcc
+compute         msdALL all msd
+compute         gr all rdf 200
+
+# ave/time: split scalars vs arrays
+# - scalars (avg centro + MSD[4]) with 'ave running' so 'overwrite' is legal
+compute         cavgHOT HOT reduce ave c_csm
+ERROR: Could not find compute group ID (src/compute.cpp:54)
+Last command: compute         cavgHOT HOT reduce ave c_csm

@@ -1,0 +1,215 @@
+LAMMPS (29 Aug 2024)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+# LAMMPS Crystal Melting Script for Li2Ti3CoO8
+# Takes ordered crystal structure and melts it at high temperature
+units metal
+atom_style charge
+boundary p p p
+processors * * *  # Use all available processors
+
+# Read CRYSTAL structure from Materials Project
+read_data Li2Ti3CoO8_crystal.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (33.778304 33.778304 33.778304)
+  1 by 2 by 3 MPI processor grid
+  reading atoms ...
+  3584 atoms
+  read_data CPU = 0.020 seconds
+
+# Define potential
+# Buckingham + Coulomb for oxide/ceramic (literature standard)
+# Using partial charges from CLAYFF/Pedone-style force fields
+
+# Set partial charges (NOT formal oxidation states!)
+set type 1 charge 2.196
+Setting atom values ...
+  512 settings made for charge
+set type 2 charge -1.05
+Setting atom values ...
+  768 settings made for charge
+set type 3 charge 1.05
+Setting atom values ...
+  256 settings made for charge
+set type 4 charge 0.525
+Setting atom values ...
+  2048 settings made for charge
+
+# Buck/coul/long with PPPM for long-range electrostatics
+pair_style buck/coul/long 12.0
+kspace_style pppm 1.0e-4  # Standard accuracy
+
+# NOTE: pair_coeff will be set after read_data
+
+# Set pair coefficients
+# Generic oxide Buckingham parameters
+pair_coeff * * 1000.0 0.35 0.0  # A=1000, rho=0.35, C=0
+pair_modify mix arithmetic
+
+# Neighbor list
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+
+# Initial minimization of crystal (CRITICAL for oxides!)
+minimize 1.0e-4 1.0e-6 1000 10000
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- Type Label Framework: https://doi.org/10.1021/acs.jpcb.3c08419
+
+@Article{Gissinger24,
+ author = {Jacob R. Gissinger, Ilia Nikiforov, Yaser Afshar, Brendon Waters, Moon-ki Choi, Daniel S. Karls, Alexander Stukowski, Wonpil Im, Hendrik Heinz, Axel Kohlmeyer, and Ellad B. Tadmor},
+ title = {Type Label Framework for Bonded Force Fields in LAMMPS},
+ journal = {J. Phys. Chem. B},
+ year =    2024,
+ volume =  128,
+ number =  13,
+ pages =   {3282–-3297}
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+PPPM initialization ...
+WARNING: System is not charge neutral, net charge = 1661.952 (src/kspace.cpp:327)
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.23448117
+  grid = 18 18 18
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.0015171285
+  estimated relative force accuracy = 0.00010535875
+  using double precision FFTW3
+  3d grid and FFT values/proc = 5200 972
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 14
+  ghost atom cutoff = 14
+  binsize = 7, bins = 5 5 5
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair buck/coul/long, perpetual
+      attributes: half, newton on
+      pair build: half/bin/atomonly/newton
+      stencil: half/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 6.363 | 6.604 | 6.743 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0              10902.195      0              10902.195      3568530.6    
+        36   0             -3040.5964      0             -3040.5964      2898748.1    
+Loop time of 0.35837 on 6 procs for 36 steps with 3584 atoms
+
+98.7% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+       10902.195076749  -3040.48886539452  -3040.59637856583
+  Force two-norm initial, final = 231.55912 1.8688019
+  Force max component initial, final = 4.3005452 0.03860483
+  Final line search alpha, max atom move = 0.64565523 0.02492541
+  Iterations, force evaluations = 36 50
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.26829    | 0.29319    | 0.31231    |   3.3 | 81.81
+Kspace  | 0.023748   | 0.04308    | 0.067961   |   8.7 | 12.02
+Neigh   | 0.013104   | 0.013349   | 0.013599   |   0.2 |  3.73
+Comm    | 0.007154   | 0.0072038  | 0.0072373  |   0.0 |  2.01
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.001546   |            |       |  0.43
+
+Nlocal:        597.333 ave         608 max         592 min
+Histogram: 4 0 0 0 0 0 0 0 0 2
+Nghost:           9537 ave        9560 max        9507 min
+Histogram: 2 0 0 0 0 0 2 0 0 2
+Neighs:         320213 ave      336656 max      298016 min
+Histogram: 2 0 0 0 0 0 0 2 0 2
+
+Total # of neighbors = 1921280
+Ave neighs/atom = 536.07143
+Neighbor list builds = 2
+Dangerous builds = 0
+
+# GENTLE START with small timestep and velocity limit
+velocity all create 10.0 12345 dist gaussian mom yes rot yes
+fix 0 all nve/limit 0.1  # Limit displacement
+fix 1a all langevin 10.0 300.0 100.0 54321
+timestep 0.25  # Very small for initial equilibration
+run 5000
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.23448117
+  grid = 18 18 18
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.0015171285
+  estimated relative force accuracy = 0.00010535875
+  using double precision FFTW3
+  3d grid and FFT values/proc = 5200 972
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Per MPI rank memory allocation (min/avg/max) = 5.582 | 5.606 | 5.619 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+        36   10            -3040.5964      0             -3035.965       2898876.5    
+      5036   1.578464      -2946.9442      0             -2946.2131      2910590.4    
+Loop time of 25.3822 on 6 procs for 5000 steps with 3584 atoms
+
+Performance: 4254.951 ns/day, 0.006 hours/ns, 196.988 timesteps/s, 706.007 katom-step/s
+98.9% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 19.652     | 20.978     | 22.454     |  23.8 | 82.65
+Kspace  | 2.1177     | 3.5918     | 4.9293     |  57.5 | 14.15
+Neigh   | 0.013124   | 0.013449   | 0.013686   |   0.2 |  0.05
+Comm    | 0.65898    | 0.66958    | 0.68411    |   1.0 |  2.64
+Output  | 1.3667e-05 | 1.8465e-05 | 3.0375e-05 |   0.0 |  0.00
+Modify  | 0.08246    | 0.084187   | 0.085453   |   0.4 |  0.33
+Other   |            | 0.04552    |            |       |  0.18
+
+Nlocal:        597.333 ave         606 max         584 min
+Histogram: 2 0 0 0 0 0 0 0 2 2
+Nghost:        9487.33 ave        9584 max        9419 min
+Histogram: 2 0 2 0 0 0 0 0 0 2
+Neighs:         319098 ave      344544 max      301576 min
+Histogram: 2 0 2 0 0 0 0 0 1 1
+
+Total # of neighbors = 1914587
+Ave neighs/atom = 534.20396
+Neighbor list builds = 2
+Dangerous builds = 0
+unfix 0
+unfix 1a
+
+# Now heat gradually from 300K to melting temperature
+fix 1 all npt temp 300.0 4500 $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+fix 1 all npt temp 300.0 4500 25 iso 1.0 1.0 $(1000.0*dt)
+fix 1 all npt temp 300.0 4500 25 iso 1.0 1.0 250
+timestep 0.5  # Standard timestep for oxides
+
+# Output
+thermo 1000
+thermo_style custom step time temp press vol etotal ke pe density
+dump 1 all custom 5000 Li2Ti3CoO8_melting_trajectory.dump id type x y z vx vy vz
+
+print "Starting MELTING of Li2Ti3CoO8: gentle heating from 300K to 4500K"
+Starting MELTING of Li2Ti3CoO8: gentle heating from 300K to 4500K
+run 100000
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.23448117
+  grid = 18 18 18
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.0015171285
+  estimated relative force accuracy = 0.00010535875
+  using double precision FFTW3
+  3d grid and FFT values/proc = 5200 972
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Per MPI rank memory allocation (min/avg/max) = 5.582 | 5.606 | 5.619 Mbytes
+   Step          Time           Temp          Press          Volume         TotEng         KinEng         PotEng        Density    
+      5036   1250.036       1.578464       2910590.4      38540.161     -2946.2131      0.73104842    -2946.9442      3.7988576    
+ERROR: Lost atoms: original 3584 current 0 (src/thermo.cpp:494)
+Last command: run 100000

@@ -1,0 +1,114 @@
+LAMMPS (29 Aug 2024)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+# ---------- PREAMBLE ----------
+units           metal
+atom_style      charge
+boundary        p p p
+read_data       Li2Cr5Si2O72_crystal.data
+Reading data file ...
+  triclinic box = (0 0 0) to (22.461078 53.608416 31.862463) with tilt (5.170074 -0.677431 4.256297)
+  1 by 3 by 2 MPI processor grid
+  reading atoms ...
+  3200 atoms
+  read_data CPU = 0.025 seconds
+
+pair_style      buck/coul/long 12.0
+kspace_style    pppm 1.0e-4
+pair_modify     mix arithmetic
+pair_coeff      * * 1388.77 0.3623 0.0
+
+neighbor        4.0 bin
+neigh_modify    every 1 delay 0 check yes
+thermo          2000
+thermo_style    custom step temp press pe etotal
+
+# ---------- HELPERS ----------
+velocity        all create 300.0 12345 mom yes rot yes dist gaussian
+fix             soft all nve/limit 0.03
+fix             tl   all langevin 300.0 300.0 5.0 7777
+timestep        0.001
+run             1500
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- Type Label Framework: https://doi.org/10.1021/acs.jpcb.3c08419
+
+@Article{Gissinger24,
+ author = {Jacob R. Gissinger, Ilia Nikiforov, Yaser Afshar, Brendon Waters, Moon-ki Choi, Daniel S. Karls, Alexander Stukowski, Wonpil Im, Hendrik Heinz, Axel Kohlmeyer, and Ellad B. Tadmor},
+ title = {Type Label Framework for Bonded Force Fields in LAMMPS},
+ journal = {J. Phys. Chem. B},
+ year =    2024,
+ volume =  128,
+ number =  13,
+ pages =   {3282–-3297}
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.24855595
+  grid = 16 36 24
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00096128556
+  estimated relative force accuracy = 6.6757588e-05
+  using double precision FFTW3
+  3d grid and FFT values/proc = 9177 2304
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 16
+  ghost atom cutoff = 16
+  binsize = 8, bins = 4 8 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair buck/coul/long, perpetual
+      attributes: half, newton on
+      pair build: half/bin/atomonly/newton/tri
+      stencil: half/bin/3d/tri
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 6.032 | 6.039 | 6.043 Mbytes
+   Step          Temp          Press          PotEng         TotEng    
+         0   300            3481921.6      12753.377      12877.428    
+      1500   1232.0202      2062288.2     -7275.6473     -6766.203     
+Loop time of 6.88214 on 6 procs for 1500 steps with 3200 atoms
+
+Performance: 18.831 ns/day, 1.274 hours/ns, 217.955 timesteps/s, 697.458 katom-step/s
+99.2% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 5.5906     | 5.6347     | 5.6741     |   1.3 | 81.87
+Kspace  | 0.75365    | 0.79406    | 0.83993    |   3.5 | 11.54
+Neigh   | 0.21121    | 0.21248    | 0.21471    |   0.2 |  3.09
+Comm    | 0.20421    | 0.20619    | 0.20819    |   0.4 |  3.00
+Output  | 1.1625e-05 | 1.5187e-05 | 2.6667e-05 |   0.0 |  0.00
+Modify  | 0.020929   | 0.021264   | 0.021529   |   0.1 |  0.31
+Other   |            | 0.01338    |            |       |  0.19
+
+Nlocal:        533.333 ave         541 max         527 min
+Histogram: 1 1 1 0 0 1 0 1 0 1
+Nghost:          10415 ave       10426 max       10404 min
+Histogram: 1 1 0 0 1 0 1 1 0 1
+Neighs:         381348 ave      387193 max      377486 min
+Histogram: 2 1 0 0 0 1 1 0 0 1
+
+Total # of neighbors = 2288087
+Ave neighs/atom = 715.02719
+Neighbor list builds = 9
+Dangerous builds = 0
+unfix           tl
+unfix           soft
+
+# sampling (order proxy + RDF + MSD)
+compute         csm all centro/atom fcc
+compute         cavg all reduce ave c_csm
+compute         msdall all msd
+compute         gr all rdf 200
+fix             obs all ave/time 200 1 200 c_cavg c_msdall[4] c_gr[*] ave running file Li2Cr5Si2O72_obs.txt overwrite
+ERROR: Invalid fix ave/time argument: c_gr[*] (src/fix_ave_time.cpp:100)
+Last command: fix             obs all ave/time 200 1 200 c_cavg c_msdall[4] c_gr[*] ave running file Li2Cr5Si2O72_obs.txt overwrite

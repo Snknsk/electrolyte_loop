@@ -1,0 +1,296 @@
+LAMMPS (29 Aug 2024)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+# ---------- PREAMBLE ----------
+units           metal
+atom_style      charge
+boundary        p p p
+read_data       Li2MgGeO4_crystal.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (29.874618 32.790958 37.714862)
+  1 by 2 by 3 MPI processor grid
+  reading atoms ...
+  3456 atoms
+  read_data CPU = 0.031 seconds
+
+pair_style      buck/coul/long 12.0
+kspace_style    pppm 1.0e-4
+pair_modify     mix arithmetic
+pair_coeff      * * 1388.77 0.3623 0.0
+
+neighbor        4.0 bin
+neigh_modify    every 1 delay 0 check yes
+thermo          2000
+thermo_style    custom step temp press pe etotal
+thermo_modify   lost error
+
+# ---------- SOFT START ----------
+velocity        all create 300.0 12345 mom yes rot yes dist gaussian
+fix             soft all nve/limit 0.03
+fix             tl   all langevin 300.0 300.0 5.0 7777
+timestep        0.001
+run             1500
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- Type Label Framework: https://doi.org/10.1021/acs.jpcb.3c08419
+
+@Article{Gissinger24,
+ author = {Jacob R. Gissinger, Ilia Nikiforov, Yaser Afshar, Brendon Waters, Moon-ki Choi, Daniel S. Karls, Alexander Stukowski, Wonpil Im, Hendrik Heinz, Axel Kohlmeyer, and Ellad B. Tadmor},
+ title = {Type Label Framework for Bonded Force Fields in LAMMPS},
+ journal = {J. Phys. Chem. B},
+ year =    2024,
+ volume =  128,
+ number =  13,
+ pages =   {3282–-3297}
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.24316038
+  grid = 18 20 24
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.0010690377
+  estimated relative force accuracy = 7.4240557e-05
+  using double precision FFTW3
+  3d grid and FFT values/proc = 6375 1440
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 16
+  ghost atom cutoff = 16
+  binsize = 8, bins = 4 5 5
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair buck/coul/long, perpetual
+      attributes: half, newton on
+      pair build: half/bin/atomonly/newton
+      stencil: half/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 6.195 | 6.195 | 6.195 Mbytes
+   Step          Temp          Press          PotEng         TotEng    
+         0   300            4264628.7      26505.525      26639.504    
+      1500   942.33356      3109477.1      9619.9156      10040.756    
+Loop time of 8.93356 on 6 procs for 1500 steps with 3456 atoms
+
+Performance: 14.507 ns/day, 1.654 hours/ns, 167.906 timesteps/s, 580.284 katom-step/s
+97.2% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 6.3395     | 6.9527     | 7.5389     |  16.9 | 77.83
+Kspace  | 0.99358    | 1.5818     | 2.1986     |  35.6 | 17.71
+Neigh   | 0.084647   | 0.087409   | 0.090823   |   0.8 |  0.98
+Comm    | 0.26402    | 0.26559    | 0.2678     |   0.3 |  2.97
+Output  | 1.2584e-05 | 1.9632e-05 | 3.3834e-05 |   0.0 |  0.00
+Modify  | 0.023741   | 0.024183   | 0.025075   |   0.3 |  0.27
+Other   |            | 0.02184    |            |       |  0.24
+
+Nlocal:            576 ave         589 max         567 min
+Histogram: 2 0 0 1 0 2 0 0 0 1
+Nghost:        11919.7 ave       11946 max       11896 min
+Histogram: 2 0 1 0 0 0 1 0 1 1
+Neighs:         461745 ave      491210 max      427280 min
+Histogram: 1 1 0 0 1 0 0 1 0 2
+
+Total # of neighbors = 2770472
+Ave neighs/atom = 801.6412
+Neighbor list builds = 9
+Dangerous builds = 0
+unfix           tl
+unfix           soft
+
+# ---------- GLOBAL PER-ATOM COMPUTES ----------
+compute         csm all centro/atom fcc
+compute         msdALL all msd
+compute         gr all rdf 200
+
+# ---------- FRACTION LADDER ----------
+variable        frac index 0.200 0.400 0.600 0.800 1.000
+label           FRAC_LOOP
+
+# Pseudo-random per-atom noise in [0,1) based on position (no chunk/atom needed)
+variable        seed equal 9999
+variable        ph   atom "abs(sin((x*12.9898 + y*78.233 + z*37.719 + v_seed)*43758.5453))"
+variable        noise atom "v_ph - floor(v_ph)"
+variable        isHot atom "v_noise < v_frac"
+
+# HOT/COLD groups for this fraction
+group           HOT variable isHot
+435 atoms in group HOT
+group           COLD subtract all HOT
+3021 atoms in group COLD
+
+# Report selection
+variable        nAll equal count(all)
+variable        nHot equal count(HOT)
+print           "Selected HOT ~ ${nHot}/${nAll} atoms (target fraction = ${frac})"
+Selected HOT ~ 435/3456 atoms (target fraction = 0.200)
+
+# ---------- PER-FRACTION SAMPLING ----------
+compute         cavgHOT HOT reduce ave c_csm
+fix             fobs all ave/time 200 1 200 c_msdALL[4] c_cavgHOT ave running file Li2MgGeO4_frac_${frac}_obs.txt overwrite
+fix             fobs all ave/time 200 1 200 c_msdALL[4] c_cavgHOT ave running file Li2MgGeO4_frac_0.200_obs.txt overwrite
+fix             frdf all ave/time 200 1 200 c_gr[*] ave running file Li2MgGeO4_frac_${frac}_rdf.txt mode vector overwrite
+fix             frdf all ave/time 200 1 200 c_gr[*] ave running file Li2MgGeO4_frac_0.200_rdf.txt mode vector overwrite
+
+# ---------- SPLIT HEAT ----------
+variable        Thot  equal 4000.0
+variable        Tcold equal 300.0
+
+fix             fH HOT  nvt temp ${Tcold} ${Thot} 5.0
+fix             fH HOT  nvt temp 300 ${Thot} 5.0
+fix             fH HOT  nvt temp 300 4000 5.0
+fix             fC COLD nvt temp ${Tcold} ${Tcold} 5.0
+fix             fC COLD nvt temp 300 ${Tcold} 5.0
+fix             fC COLD nvt temp 300 300 5.0
+fix             dtr all dt/reset 200 0.0008 0.0012 0.02
+dump            dH HOT  custom 1000 Li2MgGeO4_frac_${frac}_HOT.lammpstrj  id type x y z
+dump            dH HOT  custom 1000 Li2MgGeO4_frac_0.200_HOT.lammpstrj  id type x y z
+dump            dC COLD custom 1000 Li2MgGeO4_frac_${frac}_COLD.lammpstrj id type x y z
+dump            dC COLD custom 1000 Li2MgGeO4_frac_0.200_COLD.lammpstrj id type x y z
+dump_modify     dH sort id
+dump_modify     dC sort id
+
+run             20000
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.24316038
+  grid = 18 20 24
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.0010690377
+  estimated relative force accuracy = 7.4240557e-05
+  using double precision FFTW3
+  3d grid and FFT values/proc = 6375 1440
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 16
+  ghost atom cutoff = 16
+  binsize = 8, bins = 4 5 5
+  3 neighbor lists, perpetual/occasional/extra = 1 2 0
+  (1) pair buck/coul/long, perpetual
+      attributes: half, newton on
+      pair build: half/bin/atomonly/newton
+      stencil: half/bin/3d
+      bin: standard
+  (2) compute centro/atom, occasional
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+  (3) compute rdf, occasional, copy from (1)
+      attributes: half, newton on
+      pair build: copy
+      stencil: none
+      bin: none
+Per MPI rank memory allocation (min/avg/max) = 7.228 | 7.228 | 7.229 Mbytes
+   Step          Temp          Press          PotEng         TotEng    
+      1500   942.33356      3109477.1      9619.9156      10040.756    
+      2000   972.38115      3109857.9      9600.5353      10034.795    
+      4000   979.72367      3107686.8      9546.7364      9984.2749    
+      6000   918.83903      3105016.5      9514.9544      9925.3022    
+      8000   854.38493      3102653.3      9486.1246      9867.6876    
+     10000   805.08635      3100724.9      9456.5962      9816.1428    
+     12000   741.815        3097932.9      9437.9428      9769.2327    
+     14000   711.03961      3096838.4      9407.779       9725.3249    
+     16000   670.16339      3094716.7      9385.6489      9684.9397    
+     18000   632.76475      3092380.2      9365.282       9647.8708    
+     20000   603.63727      3091399.6      9344.7496      9614.3303    
+     21500   578.74609      3089659        9332.8401      9591.3045    
+Loop time of 111.129 on 6 procs for 20000 steps with 3456 atoms
+
+Performance: 12.440 ns/day, 1.929 hours/ns, 179.972 timesteps/s, 621.982 katom-step/s
+98.6% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 81.303     | 89.274     | 95.235     |  58.5 | 80.33
+Kspace  | 10.33      | 16.293     | 24.256     | 137.0 | 14.66
+Neigh   | 0.082866   | 0.084457   | 0.08594    |   0.4 |  0.08
+Comm    | 3.3527     | 3.3781     | 3.3892     |   0.7 |  3.04
+Output  | 0.01651    | 0.017077   | 0.017631   |   0.3 |  0.02
+Modify  | 1.9148     | 1.9205     | 1.9266     |   0.3 |  1.73
+Other   |            | 0.1609     |            |       |  0.14
+
+Nlocal:            576 ave         581 max         573 min
+Histogram: 1 1 1 1 0 1 0 0 0 1
+Nghost:        11900.3 ave       11922 max       11881 min
+Histogram: 1 0 1 0 2 0 0 1 0 1
+Neighs:         461687 ave      490779 max      430310 min
+Histogram: 2 0 0 0 0 2 0 0 0 2
+FullNghs:       923264 ave      931168 max      917699 min
+Histogram: 1 1 1 0 1 1 0 0 0 1
+
+Total # of neighbors = 5539585
+Ave neighs/atom = 1602.8892
+Neighbor list builds = 9
+Dangerous builds = 0
+unfix           dtr
+run             20000
+PPPM initialization ...
+  using 12-bit tables for long-range coulomb (src/kspace.cpp:342)
+  G vector (1/distance) = 0.24316038
+  grid = 18 20 24
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.0010690377
+  estimated relative force accuracy = 7.4240557e-05
+  using double precision FFTW3
+  3d grid and FFT values/proc = 6375 1440
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Per MPI rank memory allocation (min/avg/max) = 15.26 | 15.26 | 15.26 Mbytes
+   Step          Temp          Press          PotEng         TotEng    
+     21500   578.74609      3089659        9332.8401      9591.3045    
+     22000   566.75484      3089577        9330.5936      9583.7028    
+     24000   533.68573      3088430.5      9315.236       9553.5768    
+     26000   496.5135       3087158.7      9305.4631      9527.203     
+     28000   476.2445       3086318        9291.56        9504.2478    
+     30000   448.72797      3085104.5      9283.3659      9483.765     
+     32000   428.8876       3084196.8      9273.9571      9465.4957    
+     34000   411.95102      3083645.2      9265.0842      9449.059     
+     36000   399.60569      3083086.2      9255.9365      9434.3979    
+     38000   377.58658      3082648.8      9252.6263      9421.2542    
+     40000   367.63248      3081271.3      9245.3881      9409.5705    
+     41500   360.13453      3081804.6      9240.8024      9401.6363    
+Loop time of 106.419 on 6 procs for 20000 steps with 3456 atoms
+
+Performance: 12.990 ns/day, 1.848 hours/ns, 187.937 timesteps/s, 649.511 katom-step/s
+99.6% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 79.831     | 87.081     | 93.083     |  56.7 | 81.83
+Kspace  | 8.4224     | 14.418     | 21.661     | 139.3 | 13.55
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 3.1451     | 3.1677     | 3.184      |   0.8 |  2.98
+Output  | 0.01302    | 0.016688   | 0.017878   |   1.3 |  0.02
+Modify  | 1.5755     | 1.5875     | 1.5956     |   0.5 |  1.49
+Other   |            | 0.1477     |            |       |  0.14
+
+Nlocal:            576 ave         581 max         572 min
+Histogram: 1 0 1 1 0 2 0 0 0 1
+Nghost:        11924.5 ave       11934 max       11905 min
+Histogram: 1 0 0 0 0 1 0 1 2 1
+Neighs:         461634 ave      486994 max      433065 min
+Histogram: 2 0 0 0 0 1 1 0 0 2
+FullNghs:       923311 ave      931499 max      917309 min
+Histogram: 1 0 2 0 0 2 0 0 0 1
+
+Total # of neighbors = 5539867
+Ave neighs/atom = 1602.9708
+Neighbor list builds = 0
+Dangerous builds = 0
+
+# ---------- FAST QUENCH HOT -> 900 K ----------
+fix_modify      fH temp ${Thot} 900.0 5.0
+fix_modify      fH temp 4000 900.0 5.0
+ERROR: Could not find fix_modify temperature ID 4000 (src/fix_nh.cpp:1394)
+Last command: fix_modify      fH temp ${Thot} 900.0 5.0

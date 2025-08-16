@@ -1,0 +1,6 @@
+SYSTEM = Composite electrolyte AIMD
+ENCUT = 400   ; PREC = Normal
+IBRION = 0    ; NSW = 1000 ; POTIM = 0.5
+TEBEG  = 300  ; TEEND = 300 ; MDALGO = 2
+NELM   = 60   ; EDIFF = 1E-6
+LWAVE  = .FALSE. ; LCHARG = .FALSE.

@@ -1,0 +1,145 @@
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+atom_modify map array
+comm_modify vel yes
+
+read_data Cs2Li2TiO4_crystal.data
+pair_style   buck 12.0
+pair_modify  mix arithmetic
+pair_coeff * * 1388.77 0.3623 0.0
+neighbor 4.0 bin
+neigh_modify every 1 delay 0 check yes
+thermo_modify lost error
+# Record a sparse trajectory just for debugging
+dump mlt all custom 100000 Cs2Li2TiO4_melt_progress.dump id type x y z
+
+# ---- adaptive melt chunk 300->1240 K ----
+reset_timestep 0
+velocity all create 300 879924 mom yes rot yes dist gaussian
+fix heat all nvt temp 300 1240 5.0
+fix dtr all dt/reset 100 0.001 0.0015 0.02
+thermo 2000
+thermo_style custom step temp etotal press
+# MSD and Q6 samplers (simplified)
+compute msdall all msd
+fix msdout all ave/time 200 1 200 c_msdall[4] ave running file Cs2Li2TiO4_melt_msd.txt
+compute myRDF all rdf 200
+fix rdfout all ave/time 200 1 200 c_myRDF[*] ave running file Cs2Li2TiO4_melt_rdf.txt mode vector overwrite
+# Cheap local order proxy via centrosymmetry as stand-in for Q6 trend
+compute csm all centro/atom fcc
+compute cavg all reduce ave c_csm
+fix q6out all ave/time 200 1 200 c_cavg ave running file Cs2Li2TiO4_melt_q6.txt
+run 2000
+unfix heat
+unfix dtr
+unfix msdout
+unfix rdfout
+unfix q6out
+# ---- end chunk ----
+
+
+# ---- adaptive melt chunk 1240->2180 K ----
+reset_timestep 0
+velocity all create 1240 986100 mom yes rot yes dist gaussian
+fix heat all nvt temp 1240 2180 5.0
+fix dtr all dt/reset 100 0.001 0.0015 0.02
+thermo 2000
+thermo_style custom step temp etotal press
+# MSD and Q6 samplers (simplified)
+compute msdall all msd
+fix msdout all ave/time 200 1 200 c_msdall[4] ave running file Cs2Li2TiO4_melt_msd.txt
+compute myRDF all rdf 200
+fix rdfout all ave/time 200 1 200 c_myRDF[*] ave running file Cs2Li2TiO4_melt_rdf.txt mode vector overwrite
+# Cheap local order proxy via centrosymmetry as stand-in for Q6 trend
+compute csm all centro/atom fcc
+compute cavg all reduce ave c_csm
+fix q6out all ave/time 200 1 200 c_cavg ave running file Cs2Li2TiO4_melt_q6.txt
+run 2000
+unfix heat
+unfix dtr
+unfix msdout
+unfix rdfout
+unfix q6out
+# ---- end chunk ----
+
+
+# ---- adaptive melt chunk 2180->3120 K ----
+reset_timestep 0
+velocity all create 2180 82185 mom yes rot yes dist gaussian
+fix heat all nvt temp 2180 3120 5.0
+fix dtr all dt/reset 100 0.001 0.0015 0.02
+thermo 2000
+thermo_style custom step temp etotal press
+# MSD and Q6 samplers (simplified)
+compute msdall all msd
+fix msdout all ave/time 200 1 200 c_msdall[4] ave running file Cs2Li2TiO4_melt_msd.txt
+compute myRDF all rdf 200
+fix rdfout all ave/time 200 1 200 c_myRDF[*] ave running file Cs2Li2TiO4_melt_rdf.txt mode vector overwrite
+# Cheap local order proxy via centrosymmetry as stand-in for Q6 trend
+compute csm all centro/atom fcc
+compute cavg all reduce ave c_csm
+fix q6out all ave/time 200 1 200 c_cavg ave running file Cs2Li2TiO4_melt_q6.txt
+run 2000
+unfix heat
+unfix dtr
+unfix msdout
+unfix rdfout
+unfix q6out
+# ---- end chunk ----
+
+
+# ---- adaptive melt chunk 3120->4060 K ----
+reset_timestep 0
+velocity all create 3120 257188 mom yes rot yes dist gaussian
+fix heat all nvt temp 3120 4060 5.0
+fix dtr all dt/reset 100 0.001 0.0015 0.02
+thermo 2000
+thermo_style custom step temp etotal press
+# MSD and Q6 samplers (simplified)
+compute msdall all msd
+fix msdout all ave/time 200 1 200 c_msdall[4] ave running file Cs2Li2TiO4_melt_msd.txt
+compute myRDF all rdf 200
+fix rdfout all ave/time 200 1 200 c_myRDF[*] ave running file Cs2Li2TiO4_melt_rdf.txt mode vector overwrite
+# Cheap local order proxy via centrosymmetry as stand-in for Q6 trend
+compute csm all centro/atom fcc
+compute cavg all reduce ave c_csm
+fix q6out all ave/time 200 1 200 c_cavg ave running file Cs2Li2TiO4_melt_q6.txt
+run 2000
+unfix heat
+unfix dtr
+unfix msdout
+unfix rdfout
+unfix q6out
+# ---- end chunk ----
+
+
+# ---- adaptive melt chunk 4060->5000 K ----
+reset_timestep 0
+velocity all create 4060 791229 mom yes rot yes dist gaussian
+fix heat all nvt temp 4060 5000 5.0
+fix dtr all dt/reset 100 0.001 0.0015 0.02
+thermo 2000
+thermo_style custom step temp etotal press
+# MSD and Q6 samplers (simplified)
+compute msdall all msd
+fix msdout all ave/time 200 1 200 c_msdall[4] ave running file Cs2Li2TiO4_melt_msd.txt
+compute myRDF all rdf 200
+fix rdfout all ave/time 200 1 200 c_myRDF[*] ave running file Cs2Li2TiO4_melt_rdf.txt mode vector overwrite
+# Cheap local order proxy via centrosymmetry as stand-in for Q6 trend
+compute csm all centro/atom fcc
+compute cavg all reduce ave c_csm
+fix q6out all ave/time 200 1 200 c_cavg ave running file Cs2Li2TiO4_melt_q6.txt
+run 2000
+unfix heat
+unfix dtr
+unfix msdout
+unfix rdfout
+unfix q6out
+# ---- end chunk ----
+
+uncompute msdall
+uncompute myRDF
+undump mlt
+write_data Cs2Li2TiO4_melted_liquid.data nocoeff

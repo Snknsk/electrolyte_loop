@@ -1,0 +1,158 @@
+LAMMPS (29 Aug 2024)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+atom_modify map array
+
+# Read crystal
+read_data Li2P7H3N9_crystal.data
+Reading data file ...
+  triclinic box = (0 0 0) to (37.842116 34.078072 53.79546) with tilt (-18.534996 -1.724976 -11.15076)
+WARNING: Triclinic box skew is large. LAMMPS will run inefficiently. (src/domain.cpp:221)
+  1 by 2 by 3 MPI processor grid
+  reading atoms ...
+  5760 atoms
+  read_data CPU = 0.027 seconds
+
+# --- MELT: NO COULOMB (Buckingham only), no kspace ---
+pair_style   buck 12.0
+pair_modify  mix arithmetic
+pair_coeff * * 1388.77 0.3623 0.0
+
+neighbor 2.0 bin
+neigh_modify every 15 delay 0 check no
+thermo_modify lost error
+
+# Quick minimize (remove worst overlaps)
+minimize 1.0e-4 1.0e-6 500 5000
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Your simulation uses code contributions which should be cited:
+
+- Type Label Framework: https://doi.org/10.1021/acs.jpcb.3c08419
+
+@Article{Gissinger24,
+ author = {Jacob R. Gissinger, Ilia Nikiforov, Yaser Afshar, Brendon Waters, Moon-ki Choi, Daniel S. Karls, Alexander Stukowski, Wonpil Im, Hendrik Heinz, Axel Kohlmeyer, and Ellad B. Tadmor},
+ title = {Type Label Framework for Bonded Force Fields in LAMMPS},
+ journal = {J. Phys. Chem. B},
+ year =    2024,
+ volume =  128,
+ number =  13,
+ pages =   {3282â€“-3297}
+}
+
+CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE-CITE
+
+Switching to 'neigh_modify every 1 delay 0 check yes' setting during minimization
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 14
+  ghost atom cutoff = 14
+  binsize = 7, bins = 9 7 8
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair buck, perpetual
+      attributes: half, newton on
+      pair build: half/bin/atomonly/newton/tri
+      stencil: half/bin/3d/tri
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 6.61 | 6.618 | 6.627 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0              356161.38      0              356161.38      9167718.8    
+        65   0              43477.752      0              43477.752      2372024      
+Loop time of 3.4434 on 6 procs for 65 steps with 5760 atoms
+
+73.9% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      356161.377441299   43481.7112985426   43477.7515877781
+  Force two-norm initial, final = 18861.584 12.39263
+  Force max component initial, final = 288.41327 0.24382653
+  Final line search alpha, max atom move = 0.1968435 0.047995667
+  Iterations, force evaluations = 65 88
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.74807    | 0.82711    | 0.89974    |   5.1 | 24.02
+Neigh   | 0.11474    | 0.13771    | 0.17996    |   5.6 |  4.00
+Comm    | 1.3499     | 1.428      | 1.5038     |   4.2 | 41.47
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 1.051      |            |       | 30.51
+
+Nlocal:            960 ave         968 max         944 min
+Histogram: 2 0 0 0 0 0 0 0 0 4
+Nghost:        11009.3 ave       11064 max       10982 min
+Histogram: 4 0 0 0 0 0 0 0 0 2
+Neighs:         459755 ave      466696 max      447872 min
+Histogram: 2 0 0 0 0 0 0 0 1 3
+
+Total # of neighbors = 2758528
+Ave neighs/atom = 478.91111
+Neighbor list builds = 4
+Dangerous builds not checked
+
+# Single-stage: fast NVT ramp 300 â†’ 3500 K
+velocity all create 300.0 12345 dist gaussian mom yes rot yes
+fix heat all nvt temp 300.0 3500 5.0
+timestep 0.0015
+fix dtr all dt/reset 100 0.001 0.0015 0.02
+
+thermo 10000
+dump 1 all custom 100000 Li2P7H3N9_melting_trajectory.dump id type x y z
+print "Starting MELTING of Li2P7H3N9: single-stage NVT 300K â†’ 3500K over 8 ps"
+WARNING: Detected non-ASCII characters in input. Will try to continue by replacing with ASCII equivalents where known. (src/input.cpp:478)
+Starting MELTING of Li2P7H3N9: single-stage NVT 300K †’ 3500K over 8 ps
+run 8000
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Per MPI rank memory allocation (min/avg/max) = 4.987 | 4.994 | 5.002 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+        65   300            43477.752      0              43701.074      2375462.4    
+      8065   1527.6606      42567.997      0              43705.201      2359038.9    
+Loop time of 263.998 on 6 procs for 8000 steps with 5760 atoms
+
+Performance: 2.618 ns/day, 9.167 hours/ns, 30.303 timesteps/s, 174.547 katom-step/s
+72.9% CPU use with 6 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 62.164     | 62.931     | 63.984     |   7.5 | 23.84
+Neigh   | 17.825     | 18.26      | 18.593     |   6.9 |  6.92
+Comm    | 147.01     | 149.25     | 152.36     |  16.5 | 56.54
+Output  | 0.00296    | 0.0041684  | 0.010152   |   4.1 |  0.00
+Modify  | 31.448     | 33.459     | 35.431     |  26.6 | 12.67
+Other   |            | 0.09249    |            |       |  0.04
+
+Nlocal:            960 ave         964 max         955 min
+Histogram: 1 0 0 1 0 1 1 1 0 1
+Nghost:        11207.2 ave       11234 max       11171 min
+Histogram: 1 0 0 0 2 0 1 0 0 2
+Neighs:         456149 ave      460939 max      453240 min
+Histogram: 2 1 0 0 0 2 0 0 0 1
+
+Total # of neighbors = 2736892
+Ave neighs/atom = 475.15486
+Neighbor list builds = 533
+Dangerous builds not checked
+unfix heat
+unfix dtr
+
+# Short NPT in liquid to relax density
+fix liq all npt temp 3500 3500 10.0 iso 1.0 1.0 200.0
+timestep 0.002
+run 5000
+Generated 0 of 6 mixed pair_coeff terms from arithmetic mixing rule
+Per MPI rank memory allocation (min/avg/max) = 5.003 | 5.01 | 5.018 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press          Volume    
+      8065   1527.6606      42567.997      0              43705.201      2359038.9      69373.891    
+ERROR: Lost atoms: original 5760 current 427 (src/thermo.cpp:494)
+Last command: run 5000

@@ -1,0 +1,72 @@
+# LAMMPS Crystal Melting Script for Li2Ti3CoO8
+# Takes ordered crystal structure and melts it at high temperature
+units metal
+atom_style charge
+boundary p p p
+processors * * *  # Use all available processors
+
+# Read CRYSTAL structure from Materials Project
+read_data Li2Ti3CoO8_crystal.data
+
+# Define potential
+# Buckingham + Coulomb for oxide/ceramic (literature standard)
+# Using partial charges from CLAYFF/Pedone-style force fields
+
+# Set partial charges (NOT formal oxidation states!)
+set type 1 charge 2.196
+set type 2 charge -1.05
+set type 3 charge 1.05
+set type 4 charge 0.525
+
+# Buck/coul/long with PPPM for long-range electrostatics
+pair_style buck/coul/long 12.0
+kspace_style pppm 1.0e-4  # Standard accuracy
+
+# NOTE: pair_coeff will be set after read_data
+
+# Set pair coefficients
+# Generic oxide Buckingham parameters
+pair_coeff * * 1000.0 0.35 0.0  # A=1000, rho=0.35, C=0
+pair_modify mix arithmetic
+
+# Neighbor list
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+
+# Initial minimization of crystal (CRITICAL for oxides!)
+minimize 1.0e-4 1.0e-6 1000 10000
+
+# GENTLE START with small timestep and velocity limit
+velocity all create 10.0 12345 dist gaussian mom yes rot yes
+fix 0 all nve/limit 0.1  # Limit displacement
+fix 1a all langevin 10.0 300.0 100.0 54321
+timestep 0.25  # Very small for initial equilibration
+run 5000
+unfix 0
+unfix 1a
+
+# Now heat gradually from 300K to melting temperature
+fix 1 all npt temp 300.0 4500 $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+timestep 0.5  # Standard timestep for oxides
+
+# Output
+thermo 1000
+thermo_style custom step time temp press vol etotal ke pe density
+dump 1 all custom 5000 Li2Ti3CoO8_melting_trajectory.dump id type x y z vx vy vz
+
+print "Starting MELTING of Li2Ti3CoO8: gentle heating from 300K to 4500K"
+run 100000
+
+# STAGE 2: Hold at 4500K for 50 ps to ensure fully melted
+unfix 1
+fix 1 all npt temp 4500 4500 $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+
+print "Equilibrating Li2Ti3CoO8 MELT at 4500K for 50 ps"
+run 50000
+
+# Save melted/liquid structure
+write_data Li2Ti3CoO8_melted_liquid.data nocoeff
+write_dump all xyz Li2Ti3CoO8_melted_liquid.xyz modify element Ti O Co Li
+undump 1
+
+print "MELTING COMPLETE for {formula} - crystal is now liquid at $(temp)K"

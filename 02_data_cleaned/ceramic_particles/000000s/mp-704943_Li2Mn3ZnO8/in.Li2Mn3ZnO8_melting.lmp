@@ -1,0 +1,65 @@
+# LAMMPS Crystal Melting Script for Li2Mn3ZnO8
+# Takes ordered crystal structure and melts it at high temperature
+units metal
+atom_style charge
+boundary p p p
+processors * * *  # Use all available processors
+
+# Read CRYSTAL structure from Materials Project
+read_data Li2Mn3ZnO8_crystal.data
+
+# Define potential
+# Buckingham + Coulomb potential for ionic materials
+# Using SCALED charges (70.0%) for stability
+
+# Set scaled oxidation state charges
+set type 1 charge -1.4
+set type 2 charge 0.7
+set type 3 charge 1.4
+set type 4 charge 1.4
+
+# Use Buckingham + long-range Coulomb
+pair_style buck/coul/long 10.0
+kspace_style pppm 1.0e-5
+
+# NOTE: pair_coeff will be set after read_data
+
+# Set pair coefficients
+pair_coeff * * 200.0 0.4 0.0  # Buckingham for ionic
+
+# Neighbor list
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+
+# Initial minimization of crystal
+minimize 1.0e-4 1.0e-6 1000 10000
+
+# Initial velocities
+velocity all create 300 12345 dist gaussian mom yes rot yes
+
+# STAGE 1: Heat crystal from 300K to 4000K over 100 ps
+# Use NPT to allow expansion during melting (critical for actual melting!)
+fix 1 all npt temp 300 4000 $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+timestep 0.001
+
+# Output
+thermo 1000
+thermo_style custom step time temp press vol etotal ke pe density
+dump 1 all custom 5000 Li2Mn3ZnO8_melting_trajectory.dump id type x y z vx vy vz
+
+print "Starting MELTING of Li2Mn3ZnO8: heating crystal from 300K to 4000K"
+run 100000
+
+# STAGE 2: Hold at 4000K for 50 ps to ensure fully melted
+unfix 1
+fix 1 all npt temp 4000 4000 $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+
+print "Equilibrating Li2Mn3ZnO8 MELT at 4000K for 50 ps"
+run 50000
+
+# Save melted/liquid structure
+write_data Li2Mn3ZnO8_melted_liquid.data nocoeff
+write_dump all xyz Li2Mn3ZnO8_melted_liquid.xyz modify element O Li Zn Mn
+undump 1
+
+print "MELTING COMPLETE for {formula} - crystal is now liquid at $(temp)K"

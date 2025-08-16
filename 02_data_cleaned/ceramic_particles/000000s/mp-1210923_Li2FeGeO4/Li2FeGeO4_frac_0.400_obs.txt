@@ -1,0 +1,3 @@
+# Time-averaged data for fix fobs
+# TimeStep c_msdALL[4] c_cavgHOT
+581400 16192.5 17.8833

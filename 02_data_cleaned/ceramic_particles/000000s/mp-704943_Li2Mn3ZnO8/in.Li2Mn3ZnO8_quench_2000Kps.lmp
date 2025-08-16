@@ -1,0 +1,69 @@
+# LAMMPS Quenching Script for Li2Mn3ZnO8 - 2000 K/ps
+# FAST quench - amorphous/glassy structure
+units metal
+atom_style charge
+boundary p p p
+processors * * *  # Use all available processors
+
+# FIRST: Read structure to define box
+read_data Li2Mn3ZnO8_melted_liquid.data
+
+# THEN: Define potential (after box is defined)
+# Buckingham + Coulomb potential for ionic materials
+# Using SCALED charges (70.0%) for stability
+
+# Set scaled oxidation state charges
+set type 1 charge -1.4
+set type 2 charge 0.7
+set type 3 charge 1.4
+set type 4 charge 1.4
+
+# Use Buckingham + long-range Coulomb
+pair_style buck/coul/long 10.0
+kspace_style pppm 1.0e-5
+
+# NOTE: pair_coeff will be set after read_data
+
+# NOW set pair coefficients (after both pair_style and read_data)
+if "buck/coul/long" in potential_lines:
+    # Buckingham for ionic materials
+    pair_coeff * * 200.0 0.4 0.0  # A=200, rho=0.4, C=0
+else:
+    # Morse for non-ionic materials  
+    pair_coeff * * 0.5 1.8 2.8  # D0=0.5 eV, alpha=1.8, r0=2.8
+
+# Neighbor list
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+
+# STAGE 1: QUENCH from 4000K to 300K at 2000 K/ps
+# This will take 1.9 ps
+# Use NVT to maintain density during cooling
+fix 1 all nvt temp 4000 300 $(100.0*dt)
+timestep 0.001
+
+# Output
+thermo 1000
+thermo_style custom step time temp press vol etotal ke pe density
+dump 1 all custom 5000 Li2Mn3ZnO8_quench_2000Kps_trajectory.dump id type x y z vx vy vz
+
+print "Starting QUENCH of Li2Mn3ZnO8 from liquid at 4000K to 300K"
+print "Cooling rate: 2000 K/ps - expecting amorphous_glass"
+run 1850
+
+# STAGE 2: Equilibrate at 300K for 50 ps
+unfix 1
+fix 1 all nvt temp 300 300 $(100.0*dt)
+
+print "Equilibrating Li2Mn3ZnO8 quenched structure at 300K"
+run 50000
+
+# STAGE 3: Final minimization
+minimize 1.0e-4 1.0e-6 1000 10000
+
+# Save quenched structure with descriptive name
+write_data Li2Mn3ZnO8_quenched_2000Kps_amorphous_glass.data
+write_dump all xyz Li2Mn3ZnO8_quenched_2000Kps_amorphous_glass.xyz modify element O Li Zn Mn
+undump 1
+
+print "QUENCH COMPLETE for {formula} at {cooling_rate} K/ps - structure type: {structure_type}"

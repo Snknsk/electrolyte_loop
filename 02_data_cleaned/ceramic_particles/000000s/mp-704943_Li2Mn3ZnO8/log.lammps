@@ -1,0 +1,49 @@
+LAMMPS (29 Aug 2024)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+# LAMMPS Quenching Script for Li2Mn3ZnO8 - 5 K/ps
+# VERY SLOW quench - mostly crystalline
+units metal
+atom_style charge
+boundary p p p
+processors * * *  # Use all available processors
+
+# FIRST: Read structure to define box
+read_data Li2Mn3ZnO8_melted_liquid.data
+Reading data file ...
+  orthogonal box = (-35.814574 -35.814574 -35.814574) to (69.023966 69.023966 69.023966)
+  1 by 2 by 3 MPI processor grid
+  reading atoms ...
+  3584 atoms
+  reading velocities ...
+  3584 velocities
+  read_data CPU = 0.026 seconds
+
+# THEN: Define potential (after box is defined)
+# Buckingham + Coulomb potential for ionic materials
+# Using SCALED charges (70.0%) for stability
+
+# Set scaled oxidation state charges
+set type 1 charge -1.4
+Setting atom values ...
+  512 settings made for charge
+set type 2 charge 0.7
+Setting atom values ...
+  768 settings made for charge
+set type 3 charge 1.4
+Setting atom values ...
+  256 settings made for charge
+set type 4 charge 1.4
+Setting atom values ...
+  2048 settings made for charge
+
+# Use Buckingham + long-range Coulomb
+pair_style buck/coul/long 10.0
+kspace_style pppm 1.0e-5
+
+# NOTE: pair_coeff will be set after read_data
+
+# NOW set pair coefficients (after both pair_style and read_data)
+if "buck/coul/long" in potential_lines:
+ERROR: If command boolean cannot be single string (src/variable.cpp:5480)
+Last command: buck/coul/long

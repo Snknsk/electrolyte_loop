@@ -1,0 +1,98 @@
+units metal
+atom_style charge
+boundary p p p
+processors * * *
+atom_modify map array
+comm_modify vel yes
+
+read_data Cs2Li2GeO4_crystal.data
+pair_style   buck 12.0
+pair_modify  mix arithmetic
+pair_coeff * * 1388.77 0.3623 0.0
+
+neighbor 4.0 bin
+neigh_modify every 1 delay 0 check yes
+thermo_modify lost error
+
+# --- Global samplers & dump (stay active across chunks) ---
+compute msdall all msd
+# ave running is required to allow 'overwrite' on the file and keep the running average
+fix msdout all ave/time 200 1 200 c_msdall[4] ave running file Cs2Li2GeO4_melt_msd.txt
+
+compute myRDF all rdf 200
+fix rdfout all ave/time 200 1 200 c_myRDF[*] ave running file Cs2Li2GeO4_melt_rdf.txt mode vector overwrite
+
+# Cheap local order proxy via centrosymmetry as stand-in trend for Q6
+compute csm all centro/atom fcc
+compute cavg all reduce ave c_csm
+fix q6out all ave/time 200 1 200 c_cavg ave running file Cs2Li2GeO4_melt_q6.txt
+
+dump mlt all custom 100000 Cs2Li2GeO4_melt_progress.dump id type x y z
+
+# ---- adaptive melt chunk 300->940 K ----
+velocity all create 300 511381 mom yes rot yes dist gaussian
+fix heat all nvt temp 300 940 5.0
+fix dtr all dt/reset 100 0.001 0.0015 0.02
+thermo 2000
+thermo_style custom step temp etotal press
+run 2000
+unfix heat
+unfix dtr
+# ---- end chunk ----
+
+
+# ---- adaptive melt chunk 940->1580 K ----
+fix heat all nvt temp 940 1580 5.0
+fix dtr all dt/reset 100 0.001 0.0015 0.02
+thermo 2000
+thermo_style custom step temp etotal press
+run 2000
+unfix heat
+unfix dtr
+# ---- end chunk ----
+
+
+# ---- adaptive melt chunk 1580->2220 K ----
+fix heat all nvt temp 1580 2220 5.0
+fix dtr all dt/reset 100 0.001 0.0015 0.02
+thermo 2000
+thermo_style custom step temp etotal press
+run 2000
+unfix heat
+unfix dtr
+# ---- end chunk ----
+
+
+# ---- adaptive melt chunk 2220->2860 K ----
+fix heat all nvt temp 2220 2860 5.0
+fix dtr all dt/reset 100 0.001 0.0015 0.02
+thermo 2000
+thermo_style custom step temp etotal press
+run 2000
+unfix heat
+unfix dtr
+# ---- end chunk ----
+
+
+# ---- adaptive melt chunk 2860->3500 K ----
+fix heat all nvt temp 2860 3500 5.0
+fix dtr all dt/reset 100 0.001 0.0015 0.02
+thermo 2000
+thermo_style custom step temp etotal press
+run 2000
+unfix heat
+unfix dtr
+# ---- end chunk ----
+
+# --- teardown samplers and dump ---
+unfix msdout
+unfix rdfout
+unfix q6out
+uncompute msdall
+uncompute myRDF
+uncompute csm
+uncompute cavg
+undump mlt
+
+# Save last state as liquid
+write_data Cs2Li2GeO4_melted_liquid.data nocoeff

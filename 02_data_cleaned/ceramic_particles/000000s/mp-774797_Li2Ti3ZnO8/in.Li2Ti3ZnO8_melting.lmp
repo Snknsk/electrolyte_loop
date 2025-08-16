@@ -1,0 +1,72 @@
+# LAMMPS Crystal Melting Script for Li2Ti3ZnO8
+# Takes ordered crystal structure and melts it at high temperature
+units metal
+atom_style charge
+boundary p p p
+processors * * *  # Use all available processors
+
+# Read CRYSTAL structure from Materials Project
+read_data Li2Ti3ZnO8_crystal.data
+
+# Define potential
+# CLAYFF-based charges for oxides (literature standard)
+# Charges are internally balanced as per CLAYFF methodology
+
+# Set CLAYFF charges
+set type 1 charge -0.9450000000000001
+set type 2 charge 0.47250000000000003
+set type 3 charge 1.2240000000000002
+set type 4 charge 1.9764000000000002
+
+# Buck/coul/long with PPPM (standard for CLAYFF)
+pair_style buck/coul/long 12.0
+kspace_style pppm 1.0e-4
+
+# NOTE: pair_coeff will be set after read_data
+
+# Set pair coefficients
+# CLAYFF-compatible Buckingham parameters
+pair_coeff * * 1388.77 0.3623 0.0  # Generic oxide parameters
+pair_modify mix arithmetic
+
+# Neighbor list
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+
+# Initial minimization of crystal (CRITICAL for oxides!)
+minimize 1.0e-4 1.0e-6 1000 10000
+
+# GENTLE START with small timestep and velocity limit
+velocity all create 10.0 12345 dist gaussian mom yes rot yes
+fix 0 all nve/limit 0.1  # Limit displacement
+fix 1a all langevin 10.0 300.0 100.0 54321
+timestep 0.25  # Very small for initial equilibration
+run 5000
+unfix 0
+unfix 1a
+
+# Now heat gradually from 300K to melting temperature
+fix 1 all npt temp 300.0 4500 $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+timestep 0.5  # Standard timestep for oxides
+
+# Output
+thermo 1000
+thermo_style custom step time temp press vol etotal ke pe density
+dump 1 all custom 5000 Li2Ti3ZnO8_melting_trajectory.dump id type x y z vx vy vz
+
+print "Starting MELTING of Li2Ti3ZnO8: gentle heating from 300K to 4500K"
+run 100000
+
+# STAGE 2: Hold at 4500K for 50 ps to ensure fully melted
+unfix 1
+fix 1 all npt temp 4500 4500 $(100.0*dt) iso 1.0 1.0 $(1000.0*dt)
+
+print "Equilibrating Li2Ti3ZnO8 MELT at 4500K for 50 ps"
+run 50000
+
+# Save melted/liquid structure
+write_data Li2Ti3ZnO8_melted_liquid.data nocoeff
+write_dump all xyz Li2Ti3ZnO8_melted_liquid.xyz modify element O Li Zn Ti
+undump 1
+
+print "MELTING COMPLETE for {formula} - crystal is now liquid at $(temp)K"

@@ -1,0 +1,18 @@
+LAMMPS (29 Aug 2024)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+# LAMMPS Quenching Script for Li2V3SbO8 - 5 K/ps
+# VERY SLOW quench - mostly crystalline
+units metal
+atom_style charge
+boundary p p p
+processors * * *  # Use all available processors
+
+# Read melted/liquid structure
+read_data Li2V3SbO8_melted_liquid.data
+Reading data file ...
+  triclinic box = (0 0 0) to (30.195263 51.402916 25.778042) with tilt (15.064948 15.087062 4.428094)
+WARNING: Triclinic box skew is large. LAMMPS will run inefficiently. (src/domain.cpp:221)
+  2 by 3 by 1 MPI processor grid
+ERROR: Must define pair_style before Pair Coeffs (src/read_data.cpp:782)
+Last command: read_data Li2V3SbO8_melted_liquid.data

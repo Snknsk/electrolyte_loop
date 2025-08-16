@@ -1,0 +1,24 @@
+LAMMPS (29 Aug 2024)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+# LAMMPS Quenching Script for Ba5Li2WO53 - 5 K/ps
+# VERY SLOW quench - mostly crystalline
+units metal
+atom_style charge
+boundary p p p
+processors * * *  # Use all available processors
+
+# MUST define potential BEFORE reading data file that contains pair coeffs!
+# Define potential first
+# Morse potential for strong ceramic bonding
+# This gives REAL solid behavior, not gas!
+
+# Morse potential - much better for solids than LJ
+pair_style morse 12.0
+# pair_coeff i j D0 alpha r0
+# D0=5.0 eV (VERY strong bonds - ceramics need this!)
+# alpha=2.0 (steepness)
+# r0=2.5 Angstrom (equilibrium bond distance)
+pair_coeff * * 5.0 2.0 2.5
+ERROR: Pair_coeff command before simulation box is defined (src/input.cpp:1740)
+Last command: pair_coeff * * 5.0 2.0 2.5
